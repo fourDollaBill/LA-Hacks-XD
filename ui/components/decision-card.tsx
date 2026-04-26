@@ -1,4 +1,3 @@
-
 "use client";
 import { DecisionResult, TransportResult, InventoryResult, ForecastResult } from "@/lib/api";
 
@@ -267,16 +266,10 @@ export default function DecisionCard({ decision, transport, inventory, forecast,
         <div className="t-option" style={{
           borderColor: transport.recommended === "intermodal" ? "var(--green-border)" : "var(--border)",
           background:  transport.recommended === "intermodal" ? "var(--green-bg)"    : "var(--surface2)",
-          opacity:     interMissed ? 0.55 : 1,
         }}>
-          {transport.recommended === "intermodal" && !interMissed && (
+          {transport.recommended === "intermodal" && (
             <div className="use-this-banner" style={{ background: "var(--green)", color: "white" }}>
               ✓ USE THIS
-            </div>
-          )}
-          {interMissed && (
-            <div className="use-this-banner" style={{ background: "var(--red)", color: "white" }}>
-              ✗ NOT AVAILABLE
             </div>
           )}
           <div className="t-header">
