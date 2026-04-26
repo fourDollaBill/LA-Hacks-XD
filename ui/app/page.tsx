@@ -8,32 +8,32 @@ import InventoryCard from "@/components/inventory-card";
 import TransportCard from "@/components/transport-card";
 import DecisionCard from "@/components/decision-card";
 
-const PIPELINE_STEPS = [
-  { id: "forecast",  label: "ForecastAgent",  icon: "📈" },
-  { id: "inventory", label: "InventoryAgent",  icon: "📦" },
-  { id: "transport", label: "TransportAgent",  icon: "🚚" },
-  { id: "decision",  label: "DecisionAgent",   icon: "🧠" },
-  { id: "llm",       label: "LLM Explainer",   icon: "💬" },
+const PIPELINE = [
+  { id: "forecast",  label: "ForecastAgent",  icon: "📈", color: "#e8f4fd", text: "#1a6aa8" },
+  { id: "inventory", label: "InventoryAgent",  icon: "📦", color: "#e6f9ee", text: "#1a7a3c" },
+  { id: "transport", label: "TransportAgent",  icon: "🚚", color: "#fff4e0", text: "#c47a00" },
+  { id: "decision",  label: "DecisionAgent",   icon: "🧠", color: "#f8f5ff", text: "#7c5cbf" },
+  { id: "llm",       label: "LLM Explainer",   icon: "💬", color: "#fdeaea", text: "#b91c1c" },
 ];
 
-type PipelineState = Record<string, "idle" | "active" | "done">;
+type PStep = "idle" | "active" | "done";
 
 export default function Home() {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<RunResult | null>(null);
-  const [pipeline, setPipeline] = useState<PipelineState>({});
-  const [statusMsg, setStatusMsg] = useState("Select a scenario and run the agents");
+  const [pipeState, setPipeState] = useState<Record<string, PStep>>({});
+  const [statusMsg, setStatusMsg] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchScenarios()
       .then((s) => {
         setScenarios(s);
-        if (s.length > 0) setSelected(s[0].name);
+        if (s.length) setSelected(s[0].name);
       })
-      .catch(() => setError("⚠ Backend unreachable — run: uvicorn main:app --port 8000"));
+      .catch(() => setError("Can't reach the backend. Run: uvicorn main:app --port 8000"));
   }, []);
 
   async function handleRun() {
@@ -41,31 +41,30 @@ export default function Home() {
     setLoading(true);
     setResult(null);
     setError(null);
+    setPipeState({});
 
-    // Animate pipeline steps
-    const steps = PIPELINE_STEPS.map((s) => s.id);
-    for (let i = 0; i < steps.length; i++) {
-      setPipeline((prev) => ({ ...prev, [steps[i]]: "active" }));
-      setStatusMsg(`Running ${PIPELINE_STEPS[i].label}...`);
+    for (let i = 0; i < PIPELINE.length; i++) {
+      setPipeState((p) => ({ ...p, [PIPELINE[i].id]: "active" }));
+      setStatusMsg(`Running ${PIPELINE[i].label}…`);
       await delay(380);
-      setPipeline((prev) => ({ ...prev, [steps[i]]: "done" }));
+      setPipeState((p) => ({ ...p, [PIPELINE[i].id]: "done" }));
     }
 
     try {
       const data = await runScenario(selected);
       setResult(data);
-      setStatusMsg("✓ All agents completed");
-    } catch (e) {
-      setError("Failed to run scenario. Is the backend running?");
-      setStatusMsg("Error");
-      setPipeline({});
+      setStatusMsg("All agents finished ✓");
+    } catch {
+      setError("Something went wrong. Is the backend running?");
+      setStatusMsg("");
+      setPipeState({});
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="layout">
+    <div className="page">
       {/* Header */}
       <header>
         <div className="header-inner">
@@ -76,96 +75,88 @@ export default function Home() {
               <div className="logo-sub">Multi-Agent Supply Chain Optimizer</div>
             </div>
           </div>
-          <div className="header-right">
-            <div className="agents-badge">
-              <span className="pulse" />
-              5 AGENTS ONLINE
-            </div>
+          <div className="live-badge">
+            <span className="live-dot" />
+            5 agents online
           </div>
         </div>
       </header>
 
-      <main>
-        <div className="content">
-          {/* Left sidebar */}
-          <aside>
-            <ScenarioForm
-              scenarios={scenarios}
-              selected={selected}
-              loading={loading}
-              onSelect={setSelected}
-              onRun={handleRun}
-            />
-          </aside>
+      <div className="body">
+        {/* Sidebar */}
+        <aside>
+          <ScenarioForm
+            scenarios={scenarios}
+            selected={selected}
+            loading={loading}
+            onSelect={setSelected}
+            onRun={handleRun}
+          />
+        </aside>
 
-          {/* Right main area */}
-          <div className="main-area">
-
-            {/* Pipeline */}
-            <div className="pipeline-section">
-              <div className="section-label">// AGENT PIPELINE</div>
-              <div className="pipeline">
-                {PIPELINE_STEPS.map((step, i) => (
-                  <div key={step.id} style={{ display: "flex", alignItems: "center" }}>
-                    <div className={`pipeline-node ${pipeline[step.id] || "idle"}`}>
-                      <span className="node-icon">{step.icon}</span>
-                      <span className="node-label">{step.label}</span>
-                      {pipeline[step.id] === "done" && <span className="node-check">✓</span>}
+        {/* Main */}
+        <main>
+          {/* Pipeline */}
+          <div className="pipeline-wrap">
+            <div className="pipeline">
+              {PIPELINE.map((s, i) => {
+                const state = pipeState[s.id] || "idle";
+                return (
+                  <div key={s.id} style={{ display: "flex", alignItems: "center" }}>
+                    <div
+                      className={`pnode pnode-${state}`}
+                      style={state !== "idle" ? { background: s.color, borderColor: "transparent" } : {}}
+                    >
+                      <span className="pnode-icon">{s.icon}</span>
+                      <span className="pnode-label" style={state !== "idle" ? { color: s.text } : {}}>
+                        {s.label}
+                      </span>
+                      {state === "done" && <span className="pnode-check" style={{ color: s.text }}>✓</span>}
+                      {state === "active" && <span className="pnode-spinner" />}
                     </div>
-                    {i < PIPELINE_STEPS.length - 1 && (
-                      <div className={`pipeline-arrow ${pipeline[step.id] === "done" ? "lit" : ""}`}>→</div>
+                    {i < PIPELINE.length - 1 && (
+                      <span className={`parrow ${pipeState[s.id] === "done" ? "parrow-lit" : ""}`}>→</span>
                     )}
                   </div>
-                ))}
-              </div>
-              <div className="status-msg">{statusMsg}</div>
+                );
+              })}
             </div>
-
-            {error && <div className="error-banner">{error}</div>}
-
-            {/* Results */}
-            {result && (
-              <div className="results fade-in">
-                <div className="section-label">// AGENT OUTPUTS</div>
-                <div className="cards-grid">
-                  <ForecastCard data={result.forecast} />
-                  <InventoryCard data={result.inventory} />
-                  <TransportCard data={result.transport} />
-                  <DecisionCard
-                    decision={result.decision}
-                    llmExplanation={result.llm_explanation}
-                  />
-                </div>
-              </div>
-            )}
-
-            {!result && !loading && (
-              <div className="empty-state">
-                <div className="empty-icon">⬡</div>
-                <div className="empty-text">Run a scenario to see agent outputs</div>
-              </div>
-            )}
+            {statusMsg && <p className="status-msg">{statusMsg}</p>}
           </div>
-        </div>
-      </main>
+
+          {error && <div className="error-box">{error}</div>}
+
+          {result ? (
+            <div className="results">
+              <div className="cards-grid">
+                <ForecastCard data={result.forecast} />
+                <InventoryCard data={result.inventory} />
+                <TransportCard data={result.transport} />
+                <DecisionCard decision={result.decision} llmExplanation={result.llm_explanation} />
+              </div>
+            </div>
+          ) : !loading && !error ? (
+            <div className="empty">
+              <div className="empty-emoji">🏭</div>
+              <p className="empty-title">Ready to optimize</p>
+              <p className="empty-sub">Pick a scenario and hit Run to see all 5 agents in action.</p>
+            </div>
+          ) : null}
+        </main>
+      </div>
 
       <style jsx>{`
-        .layout {
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-        }
+        .page { min-height: 100vh; display: flex; flex-direction: column; }
 
         header {
-          border-bottom: 1px solid var(--border);
-          padding: 0 24px;
-          height: 56px;
+          background: white;
+          border-bottom: 2px solid var(--border);
+          padding: 0 28px;
+          height: 60px;
           display: flex;
           align-items: center;
           position: sticky;
           top: 0;
-          background: rgba(8, 10, 14, 0.95);
-          backdrop-filter: blur(8px);
           z-index: 50;
         }
 
@@ -179,194 +170,167 @@ export default function Home() {
         .logo { display: flex; align-items: center; gap: 12px; }
 
         .logo-mark {
-          width: 32px; height: 32px;
-          background: linear-gradient(135deg, var(--accent), #0077aa);
-          border-radius: 6px;
+          width: 36px; height: 36px;
+          background: var(--text);
+          border-radius: 10px;
           display: flex; align-items: center; justify-content: center;
           font-family: var(--mono);
-          font-size: 12px;
-          font-weight: 700;
-          color: #000;
+          font-size: 13px;
+          font-weight: 500;
+          color: white;
         }
 
-        .logo-name {
-          font-family: var(--mono);
-          font-size: 15px;
-          font-weight: 700;
-          color: var(--text);
-          letter-spacing: -0.3px;
-        }
+        .logo-name { font-weight: 800; font-size: 17px; color: var(--text); line-height: 1.2; }
+        .logo-sub { font-size: 11px; color: var(--muted); font-weight: 600; }
 
-        .logo-sub {
-          font-family: var(--mono);
-          font-size: 9px;
-          color: var(--muted);
-          letter-spacing: 1px;
-          text-transform: uppercase;
-        }
-
-        .agents-badge {
+        .live-badge {
           display: flex;
           align-items: center;
-          gap: 6px;
-          padding: 5px 12px;
-          border: 1px solid rgba(0, 212, 255, 0.25);
+          gap: 7px;
+          padding: 6px 14px;
+          background: #e6f9ee;
           border-radius: 20px;
-          font-family: var(--mono);
-          font-size: 10px;
-          color: var(--accent);
-          letter-spacing: 1px;
-          background: rgba(0, 212, 255, 0.05);
+          font-size: 13px;
+          font-weight: 700;
+          color: #1a7a3c;
         }
 
-        .pulse {
-          width: 6px; height: 6px;
-          background: var(--accent);
+        .live-dot {
+          width: 7px; height: 7px;
+          background: var(--green);
           border-radius: 50%;
           animation: pulse 2s infinite;
           display: inline-block;
         }
 
         @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.3; transform: scale(0.7); }
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(0.7); opacity: 0.5; }
         }
 
-        main { flex: 1; padding: 24px; }
-
-        .content {
+        .body {
+          flex: 1;
+          display: grid;
+          grid-template-columns: 290px 1fr;
+          gap: 0;
           max-width: 1400px;
           margin: 0 auto;
-          display: grid;
-          grid-template-columns: 280px 1fr;
-          gap: 24px;
+          width: 100%;
+          padding: 28px;
+          gap: 28px;
+          align-items: start;
         }
 
         aside {
           position: sticky;
-          top: 80px;
-          height: fit-content;
+          top: 88px;
+          background: white;
+          border: 2px solid var(--border);
+          border-radius: var(--radius);
+          padding: 20px;
         }
 
-        .main-area { display: flex; flex-direction: column; gap: 20px; }
+        main { display: flex; flex-direction: column; gap: 20px; }
 
-        .section-label {
-          font-family: var(--mono);
-          font-size: 9px;
-          letter-spacing: 2px;
-          color: var(--muted);
-          text-transform: uppercase;
-          margin-bottom: 10px;
+        .pipeline-wrap {
+          background: white;
+          border: 2px solid var(--border);
+          border-radius: var(--radius);
+          padding: 16px 20px;
         }
 
         .pipeline {
           display: flex;
           align-items: center;
           flex-wrap: wrap;
-          gap: 0;
+          gap: 4px;
         }
 
-        .pipeline-node {
+        .pnode {
           display: flex;
           align-items: center;
           gap: 6px;
-          padding: 7px 12px;
-          border: 1px solid var(--border);
-          border-radius: 5px;
-          font-family: var(--mono);
-          font-size: 11px;
+          padding: 8px 14px;
+          border: 2px solid var(--border);
+          border-radius: 30px;
+          font-size: 13px;
+          font-weight: 700;
           color: var(--muted);
-          transition: all 0.25s;
-          background: var(--surface);
+          background: var(--surface2);
+          transition: all 0.2s;
         }
 
-        .pipeline-node.active {
-          border-color: var(--accent);
-          color: var(--accent);
-          background: rgba(0, 212, 255, 0.06);
-          box-shadow: 0 0 12px rgba(0, 212, 255, 0.2);
+        .pnode-active {
+          transform: scale(1.03);
         }
 
-        .pipeline-node.done {
-          border-color: var(--green);
-          color: var(--green);
-          background: rgba(0, 230, 118, 0.04);
+        .pnode-icon { font-size: 14px; }
+        .pnode-label { color: inherit; }
+        .pnode-check { font-size: 12px; }
+
+        .pnode-spinner {
+          width: 11px; height: 11px;
+          border: 2px solid rgba(0,0,0,0.15);
+          border-top-color: currentColor;
+          border-radius: 50%;
+          animation: spin 0.7s linear infinite;
+          display: inline-block;
         }
 
-        .node-icon { font-size: 12px; }
-        .node-check { font-size: 10px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        .pipeline-arrow {
-          font-family: var(--mono);
-          font-size: 12px;
-          color: var(--border2);
-          padding: 0 6px;
-          transition: color 0.25s;
-        }
-
-        .pipeline-arrow.lit { color: var(--green); }
+        .parrow { font-size: 14px; color: var(--border); padding: 0 2px; transition: color 0.2s; }
+        .parrow-lit { color: var(--green); }
 
         .status-msg {
-          font-family: var(--mono);
-          font-size: 10px;
+          font-size: 12px;
           color: var(--muted);
+          font-weight: 600;
           margin-top: 8px;
-          letter-spacing: 0.5px;
         }
 
-        .error-banner {
-          padding: 12px 16px;
-          border: 1px solid var(--red);
-          border-radius: 6px;
-          background: rgba(255, 61, 87, 0.06);
-          font-family: var(--mono);
-          font-size: 11px;
-          color: var(--red);
+        .error-box {
+          background: #fdeaea;
+          border: 2px solid #fca5a5;
+          border-radius: var(--rsm);
+          padding: 14px 18px;
+          font-size: 14px;
+          font-weight: 600;
+          color: #b91c1c;
         }
 
         .cards-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 12px;
+          gap: 14px;
+          animation: fadeUp 0.35s ease forwards;
         }
 
-        .empty-state {
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .empty {
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          gap: 12px;
-          padding: 80px 0;
-          color: var(--muted);
+          padding: 72px 0;
+          text-align: center;
+          gap: 8px;
         }
 
-        .empty-icon {
-          font-size: 40px;
-          opacity: 0.3;
-          animation: rotate 8s linear infinite;
-        }
-
-        .empty-text {
-          font-family: var(--mono);
-          font-size: 11px;
-          letter-spacing: 1px;
-        }
-
-        @keyframes rotate { to { transform: rotate(360deg); } }
-
-        .fade-in { animation: fadeIn 0.35s ease forwards; }
-
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
+        .empty-emoji { font-size: 52px; margin-bottom: 4px; }
+        .empty-title { font-size: 20px; font-weight: 800; color: var(--text); }
+        .empty-sub { font-size: 14px; color: var(--muted); font-weight: 600; max-width: 280px; }
 
         @media (max-width: 900px) {
-          .content { grid-template-columns: 1fr; }
+          .body { grid-template-columns: 1fr; padding: 16px; }
           aside { position: static; }
           .cards-grid { grid-template-columns: 1fr; }
-          .pipeline { gap: 4px; }
-          .pipeline-arrow { display: none; }
+          .pipeline { gap: 6px; }
+          .parrow { display: none; }
         }
       `}</style>
     </div>
