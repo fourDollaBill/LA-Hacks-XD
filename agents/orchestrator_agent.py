@@ -82,12 +82,37 @@ class OrchestratorAgent:
     async def run(self, scenario_name: str, overrides: dict | None = None) -> tuple[RunResult, dict]:
         data = get_scenario_data(scenario_name)
         if overrides:
-            # Handle demand multiplier specially
+            overrides = dict(overrides)  # don't mutate the original
+
+            # 1. Demand multiplier — scales history
             multiplier = overrides.pop("demand_multiplier", None)
-            if multiplier and multiplier != 1.0:
+            if multiplier and float(multiplier) != 1.0:
                 data["demand_history"] = [
-                    round(d * multiplier) for d in data["demand_history"]
+                    max(1, round(d * float(multiplier))) for d in data["demand_history"]
                 ]
+
+            # 2. Shelf life / expiry days — recalculate expiring_soon
+            days_to_expiry = overrides.pop("days_to_expiry", None)
+            if days_to_expiry is not None:
+                days_to_expiry = int(days_to_expiry)
+                data["days_to_expiry"] = days_to_expiry
+                if days_to_expiry <= data["lead_time_truck"]:
+                    # Expires before truck even arrives — all at risk
+                    data["expiring_soon"] = data["total_units"]
+                elif days_to_expiry <= data["lead_time_intermodal"]:
+                    # Proportional risk
+                    at_risk = 1 - (days_to_expiry / data["lead_time_intermodal"])
+                    data["expiring_soon"] = round(data["total_units"] * max(at_risk, 0.1))
+                else:
+                    # Shelf life is healthy — small baseline
+                    data["expiring_soon"] = round(data["total_units"] * 0.05)
+
+            # 3. Fuel cost — direct override
+            fuel = overrides.pop("fuel_cost_index", None)
+            if fuel is not None:
+                data["fuel_cost_index"] = float(fuel)
+
+            # 4. Any remaining overrides
             data.update(overrides)
 
         # 1. Forecast
