@@ -1,58 +1,38 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,400&family=DM+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg:       #080a0e;
-  --surface:  #0f1117;
-  --surface2: #161922;
-  --border:   #1e2330;
-  --border2:  #2a3040;
-  --text:     #d4d8e2;
-  --muted:    #4a5268;
-  --accent:   #00d4ff;
-  --accent2:  #ff6b35;
-  --green:    #00e676;
-  --amber:    #ffb300;
-  --red:      #ff3d57;
-  --purple:   #9c6bff;
-  --mono:     'IBM Plex Mono', monospace;
-  --sans:     'IBM Plex Sans', sans-serif;
+  --bg:      #faf8f5;
+  --surface: #ffffff;
+  --surface2:#f4f1ec;
+  --border:  #e8e2d9;
+  --text:    #1a1714;
+  --muted:   #8a8078;
+  --red:     #e84c3d;
+  --teal:    #0d9e75;
+  --amber:   #f0921a;
+  --blue:    #2e7de8;
+  --purple:  #7c5cbf;
+  --green:   #2e9e4f;
+  --sans:    'Nunito', sans-serif;
+  --mono:    'DM Mono', monospace;
+  --radius:  16px;
+  --rsm:     10px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-
 html { scroll-behavior: smooth; }
 
 body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--sans);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Scanline overlay */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.03) 2px,
-    rgba(0, 0, 0, 0.03) 4px
-  );
-  pointer-events: none;
-  z-index: 9999;
-}
-
-::selection {
-  background: rgba(0, 212, 255, 0.2);
-  color: var(--accent);
-}
-
+::selection { background: #fddbc4; }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
