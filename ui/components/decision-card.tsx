@@ -9,294 +9,213 @@ interface Props {
   llmExplanation: string | null;
 }
 
+type Risk = "low" | "moderate" | "high" | "critical";
+const RISK_COLOR: Record<Risk, string> = { low: "#16a34a", moderate: "#d97706", high: "#c2410c", critical: "#dc2626" };
+
 export default function DecisionCard({ decision, transport, inventory, forecast, llmExplanation }: Props) {
-  const isReorder   = decision.should_reorder;
-  const accentColor = isReorder ? "#b91c1c" : "#1a7a3c";
-  const accentBg    = isReorder ? "#fdeaea" : "#e6f9ee";
-  const accentBorder= isReorder ? "#f87171" : "#4ade80";
-  const total       = decision.total_cost_score;
+  const isReorder = decision.should_reorder;
+  const total     = decision.total_cost_score;
 
-  // ── Order deadline logic ───────────────────────────────────────────────────
-  // days_until_stockout = how many days of usable stock remain at current demand
-  // To avoid stockout: order must be placed with enough time for delivery to arrive
-  // order_by_days = days_until_stockout - lead_time  (days from today)
-  // If <= 0, the window is already missed for that method
-
+  // Order deadline logic: order_by = days_until_stockout - lead_time
   const stockoutDays    = inventory.days_until_stockout;
-  const truckLead       = transport.truck.lead_time_days;
-  const intermodalLead  = transport.intermodal.lead_time_days;
-
-  const truckOrderDays      = Math.round(stockoutDays - truckLead);
-  const intermodalOrderDays = Math.round(stockoutDays - intermodalLead);
+  const truckOrderDays  = Math.round(stockoutDays - transport.truck.lead_time_days);
+  const interOrderDays  = Math.round(stockoutDays - transport.intermodal.lead_time_days);
 
   const today = new Date();
-  function dateFromNow(days: number): string {
-    if (days <= 0) return "Overdue";
-    if (days === 0) return "Today";
+  function deadlineLabel(days: number): string {
+    if (days <= 0) return "Overdue ⚠️";
     if (days === 1) return "Tomorrow";
-    const d = new Date(today);
-    d.setDate(d.getDate() + days);
-    return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    const d = new Date(today); d.setDate(d.getDate() + days);
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   }
-  function arrivalDate(orderDays: number, leadDays: number): string {
-    const d = new Date(today);
-    d.setDate(d.getDate() + Math.max(orderDays, 0) + leadDays);
-    return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  function arrivalLabel(orderDays: number, lead: number): string {
+    const d = new Date(today); d.setDate(d.getDate() + Math.max(orderDays, 0) + lead);
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   }
 
-  const truckOrderLabel      = dateFromNow(truckOrderDays);
-  const truckArrivalLabel    = arrivalDate(truckOrderDays, truckLead);
-  const intermodalOrderLabel = dateFromNow(intermodalOrderDays);
-  const intermodalArrivalLabel = arrivalDate(intermodalOrderDays, intermodalLead);
-
+  const truckUrgent      = truckOrderDays <= 2 && truckOrderDays > 0;
   const truckMissed      = truckOrderDays <= 0;
-  const intermodalMissed = intermodalOrderDays <= 0;
-  const truckUrgent      = !truckMissed && truckOrderDays <= 2;
-  const intermodalUrgent = !intermodalMissed && intermodalOrderDays <= 2;
+  const interUrgent      = interOrderDays <= 2 && interOrderDays > 0;
+  const interMissed      = interOrderDays <= 0;
 
-  const costDiff   = Math.abs(transport.truck.total_score - transport.intermodal.total_score).toFixed(2);
-  const cheaperIs  = transport.truck.total_score <= transport.intermodal.total_score ? "truck" : "intermodal";
+  function urgColor(missed: boolean, urgent: boolean) {
+    return missed ? "#dc2626" : urgent ? "#c2410c" : "#16a34a";
+  }
 
   const costBars = [
-    { label: "Transport",    val: decision.reasoning.transport_cost,    color: "#2e7de8" },
-    { label: "Stockout risk",val: decision.reasoning.stockout_risk_cost, color: "#f0921a" },
-    { label: "Spoilage risk",val: decision.reasoning.spoilage_risk_cost, color: "#e84c3d" },
+    { label: "Transport",    val: decision.reasoning.transport_cost,    color: "#2563eb" },
+    { label: "Stockout risk",val: decision.reasoning.stockout_risk_cost, color: "#d97706" },
+    { label: "Spoilage risk",val: decision.reasoning.spoilage_risk_cost, color: "#dc2626" },
   ];
 
-  function urgencyColor(missed: boolean, urgent: boolean) {
-    if (missed) return "#b91c1c";
-    if (urgent) return "#c24a10";
-    return "#1a7a3c";
-  }
-  function urgencyBg(missed: boolean, urgent: boolean) {
-    if (missed) return "#fdeaea";
-    if (urgent) return "#fff4e0";
-    return "#e6f9ee";
-  }
+  const savings    = Math.abs(transport.truck.total_score - transport.intermodal.total_score).toFixed(2);
+  const cheaperIs  = transport.truck.total_score <= transport.intermodal.total_score ? "Truck" : "Intermodal";
 
   return (
-    <div className="card" style={{ borderColor: accentBorder }}>
+    <div className="card" style={{ borderColor: isReorder ? "var(--red-border)" : "var(--green-border)" }}>
 
-      {/* ── Header ── */}
-      <div className="card-top">
-        <div className="icon-wrap" style={{ background: accentBg }}>🧠</div>
-        <div style={{ flex: 1 }}>
-          <div className="card-title">Decision & Transport</div>
-          <span className="action-chip" style={{ background: accentBg, color: accentColor }}>
+      {/* Header */}
+      <div className="card-head">
+        <div className="card-title">
+          <span className="icon">🧠</span>
+          Decision & Transport
+          <span className="ai-tag">AI</span>
+        </div>
+        <div className="head-right">
+          <span className="action-badge" style={{
+            background: isReorder ? "var(--red-bg)" : "var(--green-bg)",
+            color: isReorder ? "var(--red)" : "var(--green)",
+            border: `1px solid ${isReorder ? "var(--red-border)" : "var(--green-border)"}`,
+          }}>
             {decision.action}
           </span>
-        </div>
-        <div className="cost-pill">
-          <span className="cost-label">Total cost score</span>
-          <span className="cost-val">${total.toFixed(2)}</span>
+          <div className="score-pill">
+            <span className="score-label">Cost score</span>
+            <span className="score-val">${total.toFixed(2)}</span>
+          </div>
         </div>
       </div>
 
-      {/* ── Order summary boxes ── */}
+      {/* Order summary */}
       {isReorder && (
-        <div className="order-row">
-          <div className="order-box" style={{ background: "#e8f4fd", borderColor: "#93c5fd" }}>
-            <div className="order-label">Order quantity</div>
-            <div className="order-val" style={{ color: "#1a6aa8" }}>
+        <div className="order-grid">
+          <div className="order-box" style={{ borderColor: "var(--blue-border)", background: "var(--blue-bg)" }}>
+            <div className="ob-label">Order quantity</div>
+            <div className="ob-val" style={{ color: "var(--blue)" }}>
               {decision.order_quantity.toLocaleString()} <span>units</span>
             </div>
           </div>
-          <div className="order-box" style={{ background: "#e6f9ee", borderColor: "#86efac" }}>
-            <div className="order-label">Recommended method</div>
-            <div className="order-val" style={{ color: "#1a7a3c", fontSize: 16 }}>
+          <div className="order-box" style={{ borderColor: "var(--green-border)", background: "var(--green-bg)" }}>
+            <div className="ob-label">Ship via</div>
+            <div className="ob-val" style={{ color: "var(--green)", fontSize: 15 }}>
               {decision.transport_method}
             </div>
           </div>
-          <div className="order-box" style={{ background: "#fff4e0", borderColor: "#fcd34d" }}>
-            <div className="order-label">Days until stockout</div>
-            <div className="order-val" style={{ color: stockoutDays <= 3 ? "#b91c1c" : "#c47a00" }}>
+          <div className="order-box" style={{
+            borderColor: stockoutDays <= 3 ? "var(--red-border)" : "var(--amber-border)",
+            background: stockoutDays <= 3 ? "var(--red-bg)" : "var(--amber-bg)",
+          }}>
+            <div className="ob-label">Days to stockout</div>
+            <div className="ob-val" style={{ color: stockoutDays <= 3 ? "var(--red)" : "var(--amber)" }}>
               {stockoutDays} <span>days</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Transport comparison ── */}
-      <div className="section-label">Transport Options — Cost & Order Deadline</div>
+      {/* Transport comparison */}
+      <div className="section-title">Transport options</div>
       <div className="transport-grid">
 
         {/* Truck */}
-        <div className="t-card" style={{
-          borderColor: transport.recommended === "truck" ? "#2e7de8" : "var(--border)",
-          boxShadow: transport.recommended === "truck" ? "0 0 0 3px #e8f4fd" : "none",
+        <div className="t-option" style={{
+          borderColor: transport.recommended === "truck" ? "var(--blue-border)" : "var(--border)",
+          background: transport.recommended === "truck" ? "var(--blue-bg)" : "var(--surface2)",
         }}>
-          <div className="t-header" style={{ background: "#e8f4fd" }}>
-            <div className="t-name-row">
-              <span className="t-icon">🚛</span>
-              <span className="t-name" style={{ color: "#1a6aa8" }}>Truck</span>
-              {transport.recommended === "truck" && <span className="rec-tag" style={{ background: "#2e7de8" }}>Recommended</span>}
-            </div>
-            <span className="t-lead" style={{ color: "#1a6aa8" }}>{truckLead}-day lead time</span>
+          <div className="t-header">
+            <div className="t-name">🚛 Truck</div>
+            {transport.recommended === "truck" && <span className="t-rec">Recommended</span>}
           </div>
-
-          <div className="t-body">
-            <div className="t-cost-row">
-              <span>Cost per unit</span>
-              <span className="t-cost-val">${transport.truck.cost_per_unit.toFixed(2)}</span>
-            </div>
-            {transport.fuel_index > 1 && (
-              <div className="t-cost-row">
-                <span>Fuel surcharge ×{transport.fuel_index}</span>
-                <span className="t-cost-val" style={{ color: "#c24a10" }}>included</span>
-              </div>
-            )}
-            <div className="t-cost-row">
-              <span>Spoilage penalty</span>
-              <span className="t-cost-val">—</span>
-            </div>
-            <div className="t-cost-row total">
-              <span>Total score</span>
-              <span className="t-total" style={{ color: "#1a6aa8" }}>${transport.truck.total_score.toFixed(2)}/unit</span>
-            </div>
-
+          <div className="t-rows">
+            <div className="t-row"><span>Cost/unit</span><strong>${transport.truck.cost_per_unit.toFixed(2)}</strong></div>
+            <div className="t-row"><span>Total score</span><strong style={{ color: "var(--blue)" }}>${transport.truck.total_score.toFixed(2)}</strong></div>
+            <div className="t-row"><span>Lead time</span><strong>2 days</strong></div>
             <div className="t-divider" />
-
-            <div className="t-timeline">
-              <div className="tl-row">
-                <div className="tl-dot" style={{ background: urgencyColor(truckMissed, truckUrgent) }} />
-                <div>
-                  <div className="tl-date" style={{ color: urgencyColor(truckMissed, truckUrgent) }}>
-                    {truckMissed ? "⚠️ Order overdue" : truckOrderDays === 0 ? "⚠️ Order today" : `Order by ${truckOrderLabel}`}
-                  </div>
-                  <div className="tl-sub">
-                    {truckMissed
-                      ? "Stockout likely before truck arrives"
-                      : `${truckOrderDays} day${truckOrderDays === 1 ? "" : "s"} remaining to place order`}
-                  </div>
-                </div>
-              </div>
-              <div className="tl-line" />
-              <div className="tl-row">
-                <div className="tl-dot" style={{ background: "#2e7de8", opacity: 0.5 }} />
-                <div>
-                  <div className="tl-date" style={{ color: "var(--muted)" }}>Arrives {truckArrivalLabel}</div>
-                  <div className="tl-sub">{truckLead} days after order</div>
-                </div>
-              </div>
+            <div className="t-row">
+              <span>Order by</span>
+              <strong style={{ color: urgColor(truckMissed, truckUrgent) }}>
+                {truckMissed ? "Overdue ⚠️" : deadlineLabel(truckOrderDays)}
+              </strong>
             </div>
-
-            <div
-              className="urgency-tag"
-              style={{ background: urgencyBg(truckMissed, truckUrgent), color: urgencyColor(truckMissed, truckUrgent) }}
-            >
-              {truckMissed
-                ? "Window missed — too late for safe delivery"
-                : truckUrgent
-                ? `Urgent — only ${truckOrderDays} day${truckOrderDays === 1 ? "" : "s"} to order`
-                : `✓ ${truckOrderDays} days to place order`}
+            <div className="t-row">
+              <span>Arrives</span>
+              <strong>{arrivalLabel(truckOrderDays, transport.truck.lead_time_days)}</strong>
             </div>
+          </div>
+          <div className="urgency-tag" style={{
+            background: truckMissed ? "var(--red-bg)" : truckUrgent ? "var(--amber-bg)" : "var(--green-bg)",
+            color: urgColor(truckMissed, truckUrgent),
+          }}>
+            {truckMissed ? "Window missed" : truckUrgent ? `${truckOrderDays}d to order` : `${truckOrderDays}d window`}
           </div>
         </div>
 
         {/* Intermodal */}
-        <div className="t-card" style={{
-          borderColor: transport.recommended === "intermodal" ? "#0d9e75" : "var(--border)",
-          boxShadow: transport.recommended === "intermodal" ? "0 0 0 3px #e6f9ee" : "none",
+        <div className="t-option" style={{
+          borderColor: transport.recommended === "intermodal" ? "var(--green-border)" : "var(--border)",
+          background: transport.recommended === "intermodal" ? "var(--green-bg)" : "var(--surface2)",
         }}>
-          <div className="t-header" style={{ background: "#e6f9ee" }}>
-            <div className="t-name-row">
-              <span className="t-icon">🚂</span>
-              <span className="t-name" style={{ color: "#1a7a3c" }}>Intermodal</span>
-              {transport.recommended === "intermodal" && <span className="rec-tag" style={{ background: "#0d9e75" }}>Recommended</span>}
-            </div>
-            <span className="t-lead" style={{ color: "#1a7a3c" }}>{intermodalLead}-day lead time</span>
+          <div className="t-header">
+            <div className="t-name">🚂 Intermodal</div>
+            {transport.recommended === "intermodal" && <span className="t-rec" style={{ color: "var(--green)", background: "var(--green-bg)", borderColor: "var(--green-border)" }}>Recommended</span>}
           </div>
-
-          <div className="t-body">
-            <div className="t-cost-row">
-              <span>Cost per unit</span>
-              <span className="t-cost-val">${transport.intermodal.cost_per_unit.toFixed(2)}</span>
+          <div className="t-rows">
+            <div className="t-row"><span>Cost/unit</span><strong>${transport.intermodal.cost_per_unit.toFixed(2)}</strong></div>
+            <div className="t-row">
+              <span>Total score</span>
+              <strong style={{ color: "var(--green)" }}>${transport.intermodal.total_score.toFixed(2)}</strong>
             </div>
-            {transport.fuel_index > 1 && (
-              <div className="t-cost-row">
-                <span>Fuel surcharge ×{transport.fuel_index}</span>
-                <span className="t-cost-val" style={{ color: "#c24a10" }}>included</span>
+            <div className="t-row"><span>Lead time</span><strong>5 days</strong></div>
+            {transport.intermodal.spoilage_penalty > 0 && (
+              <div className="t-row">
+                <span>Spoilage penalty</span>
+                <strong style={{ color: "var(--red)" }}>+${transport.intermodal.spoilage_penalty.toFixed(2)}</strong>
               </div>
             )}
-            <div className="t-cost-row">
-              <span>Spoilage penalty</span>
-              <span className="t-cost-val" style={{ color: transport.intermodal.spoilage_penalty > 0 ? "#c24a10" : "var(--muted)" }}>
-                {transport.intermodal.spoilage_penalty > 0 ? `+$${transport.intermodal.spoilage_penalty.toFixed(2)}/unit` : "—"}
-              </span>
-            </div>
-            <div className="t-cost-row total">
-              <span>Total score</span>
-              <span className="t-total" style={{ color: "#1a7a3c" }}>${transport.intermodal.total_score.toFixed(2)}/unit</span>
-            </div>
-
             <div className="t-divider" />
-
-            <div className="t-timeline">
-              <div className="tl-row">
-                <div className="tl-dot" style={{ background: urgencyColor(intermodalMissed, intermodalUrgent) }} />
-                <div>
-                  <div className="tl-date" style={{ color: urgencyColor(intermodalMissed, intermodalUrgent) }}>
-                    {intermodalMissed ? "⚠️ Order overdue" : intermodalOrderDays === 0 ? "⚠️ Order today" : `Order by ${intermodalOrderLabel}`}
-                  </div>
-                  <div className="tl-sub">
-                    {intermodalMissed
-                      ? "Stockout will occur before intermodal arrives"
-                      : `${intermodalOrderDays} day${intermodalOrderDays === 1 ? "" : "s"} remaining to place order`}
-                  </div>
-                </div>
-              </div>
-              <div className="tl-line" />
-              <div className="tl-row">
-                <div className="tl-dot" style={{ background: "#0d9e75", opacity: 0.5 }} />
-                <div>
-                  <div className="tl-date" style={{ color: "var(--muted)" }}>Arrives {intermodalArrivalLabel}</div>
-                  <div className="tl-sub">{intermodalLead} days after order</div>
-                </div>
-              </div>
+            <div className="t-row">
+              <span>Order by</span>
+              <strong style={{ color: urgColor(interMissed, interUrgent) }}>
+                {interMissed ? "Overdue ⚠️" : deadlineLabel(interOrderDays)}
+              </strong>
             </div>
-
-            <div
-              className="urgency-tag"
-              style={{ background: urgencyBg(intermodalMissed, intermodalUrgent), color: urgencyColor(intermodalMissed, intermodalUrgent) }}
-            >
-              {intermodalMissed
-                ? "Window missed — switch to truck"
-                : intermodalUrgent
-                ? `Urgent — only ${intermodalOrderDays} day${intermodalOrderDays === 1 ? "" : "s"} to order`
-                : `✓ ${intermodalOrderDays} days to place order`}
+            <div className="t-row">
+              <span>Arrives</span>
+              <strong>{arrivalLabel(interOrderDays, transport.intermodal.lead_time_days)}</strong>
             </div>
+          </div>
+          <div className="urgency-tag" style={{
+            background: interMissed ? "var(--red-bg)" : interUrgent ? "var(--amber-bg)" : "var(--green-bg)",
+            color: urgColor(interMissed, interUrgent),
+          }}>
+            {interMissed ? "Window missed" : interUrgent ? `${interOrderDays}d to order` : `${interOrderDays}d window`}
           </div>
         </div>
       </div>
 
-      {/* ── Savings callout ── */}
-      <div className="savings-bar">
-        <span className="savings-label">Cost difference:</span>
-        <span className="savings-val">
-          {cheaperIs === "truck" ? "🚛 Truck" : "🚂 Intermodal"} saves <strong>${costDiff}/unit</strong>
-          {" "}vs the alternative
-        </span>
-        <span className="savings-label" style={{ marginLeft: "auto" }}>
-          Fuel index: <strong style={{ color: transport.fuel_index > 1.3 ? "#c24a10" : "var(--text)" }}>×{transport.fuel_index.toFixed(1)}</strong>
-        </span>
+      {/* Savings + fuel */}
+      <div className="savings-row">
+        <span>{cheaperIs} saves <strong>${savings}/unit</strong> vs alternative</span>
+        <span>Fuel ×{transport.fuel_index.toFixed(1)} {transport.fuel_index > 1.3 ? "⚠️" : "✓"}</span>
       </div>
 
-      {/* ── Cost breakdown bars ── */}
-      <div className="section-label" style={{ marginTop: 16 }}>Why this decision — Cost Score Breakdown</div>
+      {/* Cost breakdown */}
+      <div className="section-title">Cost score breakdown</div>
       {costBars.map((b) => (
-        <div key={b.label} className="bar-row">
-          <span className="bar-label">{b.label}</span>
-          <div className="bar-track">
-            <div className="bar-fill" style={{ width: total > 0 ? `${Math.round((b.val / total) * 100)}%` : "0%", background: b.color }} />
+        <div key={b.label} className="cost-bar-row">
+          <span className="cost-label">{b.label}</span>
+          <div className="cost-track">
+            <div className="cost-fill" style={{
+              width: total > 0 ? `${Math.round((b.val / total) * 100)}%` : "0%",
+              background: b.color,
+            }} />
           </div>
-          <span className="bar-amt">${b.val.toFixed(2)}</span>
+          <span className="cost-amt">${b.val.toFixed(2)}</span>
         </div>
       ))}
 
-      {/* ── AI Insight ── */}
+      {/* AI reasoning */}
+      {(decision as any).decision_reasoning && (
+        <div className="reasoning-box" style={{ borderColor: "var(--purple-border)", background: "var(--purple-bg)" }}>
+          <span className="reasoning-label">AI reasoning</span>
+          <p className="reasoning-text">{(decision as any).decision_reasoning}</p>
+        </div>
+      )}
+
+      {/* LLM explanation */}
       {llmExplanation && (
         <div className="llm-box">
-          <div className="llm-label">💬 AI Insight — powered by DeepSeek on DGX Spark</div>
+          <span className="llm-label">💬 Summary</span>
           <p className="llm-text">{llmExplanation}</p>
         </div>
       )}
@@ -304,106 +223,68 @@ export default function DecisionCard({ decision, transport, inventory, forecast,
       <style jsx>{`
         .card {
           background: var(--surface);
-          border: 2px solid;
+          border: 1px solid;
           border-radius: var(--radius);
-          padding: 20px;
+          padding: 18px;
           grid-column: 1 / -1;
-          transition: border-color 0.3s;
+          box-shadow: var(--shadow-sm);
         }
 
-        .card-top {
-          display: flex; align-items: flex-start; gap: 12px;
-          margin-bottom: 18px; flex-wrap: wrap;
+        .card-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+        .card-title { font-size: 13px; font-weight: 600; color: var(--text2); display: flex; align-items: center; gap: 6px; }
+        .icon { font-size: 15px; }
+        .ai-tag { font-size: 10px; font-weight: 700; background: var(--purple-bg); color: var(--purple); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--purple-border); }
+        .head-right { display: flex; align-items: center; gap: 12px; }
+        .action-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+        .score-pill { display: flex; flex-direction: column; align-items: flex-end; }
+        .score-label { font-size: 10px; color: var(--muted); }
+        .score-val { font-size: 20px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+
+        .order-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 18px; }
+        .order-box  { border: 1px solid; border-radius: var(--radius-sm); padding: 12px 14px; }
+        .ob-label   { font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+        .ob-val     { font-size: 20px; font-weight: 700; line-height: 1.1; }
+        .ob-val span{ font-size: 12px; font-weight: 500; color: var(--muted); }
+
+        .section-title { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; margin-top: 14px; }
+
+        .transport-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+
+        .t-option { border: 1px solid; border-radius: var(--radius-sm); overflow: hidden; transition: all 0.15s; }
+        .t-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+        .t-name   { font-size: 13px; font-weight: 700; color: var(--text); }
+        .t-rec    { font-size: 10px; font-weight: 700; color: var(--blue); background: white; border: 1px solid var(--blue-border); padding: 1px 7px; border-radius: 20px; }
+        .t-rows   { padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; }
+        .t-row    { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+        .t-row strong { color: var(--text); }
+        .t-divider{ height: 1px; background: var(--border); margin: 3px 0; }
+        .urgency-tag { margin: 0 10px 10px; padding: 5px 10px; border-radius: var(--radius-xs); font-size: 11px; font-weight: 600; text-align: center; }
+
+        .savings-row {
+          display: flex; justify-content: space-between;
+          font-size: 12px; color: var(--muted);
+          background: var(--surface2); border-radius: var(--radius-xs);
+          padding: 8px 12px; margin-bottom: 14px;
         }
-        .icon-wrap {
-          width: 40px; height: 40px; border-radius: 10px;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 18px; flex-shrink: 0;
-        }
-        .card-title  { font-weight: 800; font-size: 15px; color: var(--text); margin-bottom: 4px; }
-        .action-chip { display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 13px; font-weight: 800; }
-        .cost-pill   { display: flex; flex-direction: column; align-items: flex-end; }
-        .cost-label  { font-size: 11px; color: var(--muted); font-weight: 700; }
-        .cost-val    { font-size: 22px; font-weight: 800; color: var(--text); }
+        .savings-row strong { color: var(--text); }
 
-        .order-row {
-          display: grid; grid-template-columns: repeat(3, 1fr);
-          gap: 12px; margin-bottom: 20px;
-        }
-        .order-box   { border: 2px solid; border-radius: var(--rsm); padding: 14px 16px; }
-        .order-label { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-        .order-val   { font-weight: 800; font-size: 22px; line-height: 1.1; }
-        .order-val span { font-size: 13px; font-weight: 600; }
+        .cost-bar-row { display: grid; grid-template-columns: 100px 1fr 60px; align-items: center; gap: 10px; margin-bottom: 6px; }
+        .cost-label   { font-size: 12px; color: var(--text2); font-weight: 500; }
+        .cost-track   { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+        .cost-fill    { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+        .cost-amt     { font-size: 12px; font-weight: 600; color: var(--text); text-align: right; font-family: var(--mono); }
 
-        .section-label {
-          font-size: 10px; font-weight: 700; color: var(--muted);
-          text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;
-        }
+        .reasoning-box { border: 1px solid; border-radius: var(--radius-xs); padding: 10px 12px; margin-top: 14px; }
+        .reasoning-label { font-size: 10px; font-weight: 600; color: var(--purple); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px; }
+        .reasoning-text  { font-size: 12px; color: #5b21b6; line-height: 1.5; font-style: italic; }
 
-        .transport-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+        .llm-box { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-xs); padding: 10px 12px; margin-top: 10px; }
+        .llm-label{ font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px; }
+        .llm-text { font-size: 13px; color: var(--text2); line-height: 1.6; font-style: italic; }
 
-        .t-card   { border: 2px solid; border-radius: var(--radius); overflow: hidden; transition: all 0.2s; }
-        .t-header { padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
-        .t-name-row { display: flex; align-items: center; gap: 8px; }
-        .t-icon  { font-size: 18px; }
-        .t-name  { font-size: 16px; font-weight: 800; }
-        .rec-tag { color: white; font-size: 10px; font-weight: 800; padding: 2px 9px; border-radius: 20px; }
-        .t-lead  { font-size: 12px; font-weight: 700; }
-        .t-body  { padding: 14px 16px; }
-
-        .t-cost-row {
-          display: flex; justify-content: space-between; align-items: center;
-          font-size: 13px; color: var(--muted); font-weight: 600; margin-bottom: 6px;
-        }
-        .t-cost-row.total { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 4px; font-weight: 800; color: var(--text); }
-        .t-cost-val { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--text); }
-        .t-total    { font-family: var(--mono); font-size: 17px; font-weight: 800; }
-
-        .t-divider { height: 1px; background: var(--border); margin: 12px 0; }
-
-        .t-timeline { display: flex; flex-direction: column; gap: 0; margin-bottom: 12px; }
-        .tl-row { display: flex; gap: 10px; align-items: flex-start; position: relative; }
-        .tl-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
-        .tl-line { width: 2px; height: 20px; background: var(--border); margin: 2px 0 2px 4px; }
-        .tl-date { font-size: 13px; font-weight: 800; color: var(--text); line-height: 1.3; }
-        .tl-sub  { font-size: 11px; color: var(--muted); font-weight: 600; margin-top: 1px; }
-
-        .urgency-tag {
-          padding: 8px 12px; border-radius: var(--rsm);
-          font-size: 12px; font-weight: 700; line-height: 1.4;
-        }
-
-        .savings-bar {
-          display: flex; align-items: center; gap: 10px;
-          background: var(--surface2); border-radius: var(--rsm);
-          padding: 10px 16px; font-size: 13px; color: var(--muted);
-          font-weight: 600; margin-bottom: 14px; flex-wrap: wrap;
-        }
-        .savings-label { font-size: 12px; font-weight: 700; }
-        .savings-val   { color: var(--text); }
-
-        .bar-row {
-          display: grid; grid-template-columns: 110px 1fr 70px;
-          align-items: center; gap: 10px; margin-bottom: 8px;
-        }
-        .bar-label { font-size: 13px; color: var(--text); font-weight: 600; }
-        .bar-track { height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
-        .bar-fill  { height: 100%; border-radius: 4px; transition: width 0.7s cubic-bezier(.4,0,.2,1); }
-        .bar-amt   { font-size: 13px; font-weight: 700; color: var(--text); text-align: right; font-family: var(--mono); }
-
-        .llm-box {
-          background: #f8f5ff; border: 2px solid #e2d9f7;
-          border-radius: var(--rsm); padding: 14px 16px; margin-top: 16px;
-        }
-        .llm-label {
-          font-size: 11px; font-weight: 800; color: #7c5cbf;
-          margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
-        }
-        .llm-text { font-size: 14px; color: #4a3a6e; font-style: italic; font-weight: 400; line-height: 1.65; }
-
-        @media (max-width: 700px) {
+        @media (max-width: 640px) {
           .transport-grid { grid-template-columns: 1fr; }
-          .order-row { grid-template-columns: 1fr 1fr; }
+          .order-grid { grid-template-columns: 1fr 1fr; }
         }
       `}</style>
     </div>
