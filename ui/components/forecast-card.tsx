@@ -1,153 +1,161 @@
 "use client";
 import { ForecastResult } from "@/lib/api";
 
-const TREND_STYLES = {
-  rising:  { bg: "#fff4e0", color: "#c47a00", arrow: "↑" },
-  stable:  { bg: "#e8f4fd", color: "#1a6aa8", arrow: "→" },
-  falling: { bg: "#f0f0f0", color: "#666",    arrow: "↓" },
+const TREND = {
+  rising:  { color: "#d97706", bg: "#fffbeb", label: "Rising ↑" },
+  stable:  { color: "#2563eb", bg: "#eff6ff", label: "Stable →" },
+  falling: { color: "#6b7280", bg: "#f3f4f6", label: "Falling ↓" },
 };
 
 export default function ForecastCard({ data }: { data: ForecastResult }) {
   const max = Math.max(...data.history);
-  const t = TREND_STYLES[data.trend];
+  const t   = TREND[data.trend as keyof typeof TREND] ?? TREND.stable;
 
   return (
     <div className="card">
-      <div className="card-top">
-        <div className="icon-wrap" style={{ background: "#e8f4fd" }}>📈</div>
-        <div>
-          <div className="card-title">Demand Forecast</div>
-          <span className="trend-chip" style={{ background: t.bg, color: t.color }}>
-            {t.arrow} {data.trend}
-          </span>
+      <div className="card-head">
+        <div className="card-title">
+          <span className="icon">📈</span>
+          Demand Forecast
+          <span className="ai-tag">AI</span>
         </div>
+        <span className="trend-pill" style={{ background: t.bg, color: t.color }}>
+          {t.label}
+        </span>
       </div>
 
       <div className="metrics">
         <div className="metric">
-          <div className="big-num">{data.predicted_demand}</div>
+          <div className="metric-val">{data.predicted_demand}</div>
           <div className="metric-label">units / day</div>
         </div>
         <div className="divider" />
         <div className="metric">
-          <div className="big-num">{data.forecast_3_days}</div>
+          <div className="metric-val">{data.forecast_3_days}</div>
           <div className="metric-label">3-day total</div>
         </div>
         <div className="divider" />
         <div className="metric">
-          <div className="big-num" style={{ fontSize: 16, fontWeight: 700, color: "var(--teal)" }}>
+          <div className="metric-val conf" style={{ color: data.confidence === "high" ? "#16a34a" : data.confidence === "medium" ? "#d97706" : "#6b7280" }}>
             {data.confidence}
           </div>
           <div className="metric-label">confidence</div>
         </div>
       </div>
 
-      <div className="chart-label">Last 7 days</div>
-      <div className="bars">
-        {data.history.map((v, i) => (
-          <div key={i} className="bar-col">
-            <div
-              className="bar"
-              style={{
-                height: `${Math.round((v / max) * 52)}px`,
-                background: i === data.history.length - 1 ? "var(--blue)" : "#c8dff9",
-              }}
-            />
-            <span className="bar-num">{v}</span>
-          </div>
-        ))}
+      <div className="chart">
+        <div className="chart-label">7-day history</div>
+        <div className="bars">
+          {data.history.map((v, i) => (
+            <div key={i} className="bar-col">
+              <div
+                className="bar"
+                style={{
+                  height: `${Math.round((v / max) * 48)}px`,
+                  background: i === data.history.length - 1 ? "var(--blue)" : "var(--border2)",
+                }}
+              />
+              <span className="bar-num">{v}</span>
+            </div>
+          ))}
+        </div>
       </div>
+
+      {data.reasoning && (
+        <div className="reasoning">
+          <span className="reasoning-label">AI reasoning</span>
+          <p className="reasoning-text">{data.reasoning}</p>
+        </div>
+      )}
 
       <style jsx>{`
         .card {
           background: var(--surface);
-          border: 2px solid var(--border);
+          border: 1px solid var(--border);
           border-radius: var(--radius);
-          padding: 20px;
+          padding: 18px;
+          box-shadow: var(--shadow-sm);
         }
 
-        .card-top {
+        .card-head {
           display: flex;
+          justify-content: space-between;
           align-items: center;
-          gap: 12px;
-          margin-bottom: 18px;
-        }
-
-        .icon-wrap {
-          width: 40px; height: 40px;
-          border-radius: 10px;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 18px;
-          flex-shrink: 0;
+          margin-bottom: 16px;
         }
 
         .card-title {
-          font-weight: 800;
-          font-size: 15px;
-          color: var(--text);
-          line-height: 1.2;
-          margin-bottom: 4px;
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--text2);
+          display: flex;
+          align-items: center;
+          gap: 6px;
         }
 
-        .trend-chip {
-          display: inline-block;
-          padding: 2px 10px;
-          border-radius: 20px;
-          font-size: 12px;
+        .icon { font-size: 15px; }
+
+        .ai-tag {
+          font-size: 10px;
           font-weight: 700;
-          text-transform: capitalize;
+          background: var(--purple-bg);
+          color: var(--purple);
+          padding: 1px 6px;
+          border-radius: 4px;
+          border: 1px solid var(--purple-border);
+          letter-spacing: 0.3px;
+        }
+
+        .trend-pill {
+          font-size: 12px;
+          font-weight: 600;
+          padding: 3px 10px;
+          border-radius: 20px;
         }
 
         .metrics {
           display: flex;
           align-items: center;
-          gap: 0;
-          margin-bottom: 18px;
           background: var(--surface2);
-          border-radius: var(--rsm);
+          border-radius: var(--radius-xs);
           padding: 12px 0;
+          margin-bottom: 16px;
         }
 
-        .metric {
-          flex: 1;
-          text-align: center;
-        }
+        .metric { flex: 1; text-align: center; }
 
-        .divider {
-          width: 1px;
-          height: 32px;
-          background: var(--border);
-          flex-shrink: 0;
-        }
+        .divider { width: 1px; height: 28px; background: var(--border); flex-shrink: 0; }
 
-        .big-num {
-          font-weight: 800;
-          font-size: 24px;
+        .metric-val {
+          font-size: 22px;
+          font-weight: 700;
           color: var(--text);
           line-height: 1;
+          font-variant-numeric: tabular-nums;
         }
+
+        .conf { font-size: 14px !important; font-weight: 600 !important; text-transform: capitalize; }
 
         .metric-label {
           font-size: 11px;
           color: var(--muted);
-          margin-top: 3px;
-          font-weight: 600;
+          margin-top: 2px;
         }
 
+        .chart { margin-bottom: 12px; }
+
         .chart-label {
-          font-size: 12px;
-          font-weight: 700;
+          font-size: 11px;
           color: var(--muted);
-          text-transform: uppercase;
-          letter-spacing: 0.6px;
+          font-weight: 500;
           margin-bottom: 8px;
         }
 
         .bars {
           display: flex;
           align-items: flex-end;
-          gap: 5px;
-          height: 72px;
+          gap: 4px;
+          height: 60px;
         }
 
         .bar-col {
@@ -162,15 +170,35 @@ export default function ForecastCard({ data }: { data: ForecastResult }) {
 
         .bar {
           width: 100%;
-          border-radius: 4px 4px 0 0;
-          transition: height 0.5s cubic-bezier(.4,0,.2,1);
-          min-height: 4px;
+          border-radius: 3px 3px 0 0;
+          transition: height 0.4s ease;
+          min-height: 3px;
         }
 
-        .bar-num {
+        .bar-num { font-size: 9px; color: var(--faint); font-family: var(--mono); }
+
+        .reasoning {
+          background: var(--purple-bg);
+          border: 1px solid var(--purple-border);
+          border-radius: var(--radius-xs);
+          padding: 10px 12px;
+        }
+
+        .reasoning-label {
           font-size: 10px;
-          color: var(--muted);
           font-weight: 600;
+          color: var(--purple);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          display: block;
+          margin-bottom: 4px;
+        }
+
+        .reasoning-text {
+          font-size: 12px;
+          color: #5b21b6;
+          line-height: 1.5;
+          font-style: italic;
         }
       `}</style>
     </div>
