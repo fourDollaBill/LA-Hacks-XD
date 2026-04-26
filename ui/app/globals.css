@@ -1,22 +1,47 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,400&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg:      #faf8f5;
-  --surface: #ffffff;
-  --surface2:#f4f1ec;
-  --border:  #e8e2d9;
-  --text:    #1a1714;
-  --muted:   #8a8078;
-  --red:     #e84c3d;
-  --teal:    #0d9e75;
-  --amber:   #f0921a;
-  --blue:    #2e7de8;
-  --purple:  #7c5cbf;
-  --green:   #2e9e4f;
-  --sans:    'Nunito', sans-serif;
-  --mono:    'DM Mono', monospace;
-  --radius:  16px;
-  --rsm:     10px;
+  /* Core */
+  --bg:       #f9fafb;
+  --surface:  #ffffff;
+  --surface2: #f3f4f6;
+  --border:   #e5e7eb;
+  --border2:  #d1d5db;
+  --text:     #111827;
+  --text2:    #374151;
+  --muted:    #6b7280;
+  --faint:    #9ca3af;
+
+  /* Brand */
+  --blue:     #2563eb;
+  --blue-bg:  #eff6ff;
+  --blue-border: #bfdbfe;
+  --green:    #16a34a;
+  --green-bg: #f0fdf4;
+  --green-border: #bbf7d0;
+  --amber:    #d97706;
+  --amber-bg: #fffbeb;
+  --amber-border: #fde68a;
+  --red:      #dc2626;
+  --red-bg:   #fef2f2;
+  --red-border: #fecaca;
+  --purple:   #7c3aed;
+  --purple-bg:#f5f3ff;
+  --purple-border: #ddd6fe;
+
+  /* Type */
+  --sans: 'Inter', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+
+  /* Shape */
+  --radius:   12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow:    0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,13 +51,15 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--sans);
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.6;
-  min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-::selection { background: #fddbc4; }
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::selection { background: #dbeafe; color: #1e40af; }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
