@@ -1,0 +1,6 @@
+scenario_name,total_units,expiring_soon,days_to_expiry,lead_time_truck,lead_time_intermodal,reorder_threshold,order_max
+normal,500,50,6,2,5,200,400
+high_demand,300,40,5,2,5,200,600
+high_fuel,450,30,8,2,5,200,400
+expiry_risk,420,280,3,2,5,200,400
+low_stock,120,10,10,2,5,200,500
