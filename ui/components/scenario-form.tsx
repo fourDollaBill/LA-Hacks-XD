@@ -12,129 +12,139 @@ interface Props {
 export default function ScenarioForm({ scenarios, selected, loading, onSelect, onRun }: Props) {
   return (
     <div className="wrap">
-      <p className="section-label">Choose a scenario</p>
-      <div className="grid">
+      <div className="label">Scenarios</div>
+      <div className="list">
         {scenarios.map((s) => (
           <button
             key={s.name}
-            className={`btn ${selected === s.name ? "active" : ""}`}
+            className={`item ${selected === s.name ? "active" : ""}`}
             style={{ "--c": s.color } as React.CSSProperties}
             onClick={() => onSelect(s.name)}
           >
             <span className="dot" />
-            <span className="btn-label">{s.label}</span>
-            <span className="btn-desc">{s.description}</span>
+            <div className="item-text">
+              <span className="item-name">{s.label}</span>
+              <span className="item-desc">{s.description}</span>
+            </div>
           </button>
         ))}
       </div>
 
-      <button className={`run ${loading ? "busy" : ""}`} onClick={onRun} disabled={!selected || loading}>
-        {loading ? (
-          <><span className="spinner" /> Agents running…</>
-        ) : (
-          <>Run all agents ›</>
-        )}
+      <button className="run-btn" onClick={onRun} disabled={!selected || loading}>
+        {loading
+          ? <><span className="spin" /> Running agents…</>
+          : <>Run analysis</>
+        }
       </button>
 
-      <style jsx>{`
-        .wrap { display: flex; flex-direction: column; gap: 14px; }
+      <div className="hint">
+        {loading
+          ? "LLM agents are reasoning…"
+          : "2 agents use LLM reasoning"}
+      </div>
 
-        .section-label {
-          font-weight: 700;
-          font-size: 13px;
+      <style jsx>{`
+        .wrap { display: flex; flex-direction: column; gap: 12px; }
+
+        .label {
+          font-size: 11px;
+          font-weight: 600;
           color: var(--muted);
           text-transform: uppercase;
-          letter-spacing: 0.8px;
+          letter-spacing: 0.6px;
         }
 
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .list { display: flex; flex-direction: column; gap: 2px; }
 
-        .btn {
-          background: var(--surface);
-          border: 2px solid var(--border);
-          border-radius: var(--rsm);
-          padding: 12px 14px;
+        .item {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          padding: 9px 10px;
+          background: transparent;
+          border: 1px solid transparent;
+          border-radius: var(--radius-sm);
           cursor: pointer;
           text-align: left;
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-          transition: all 0.18s;
+          transition: all 0.12s;
+          width: 100%;
         }
 
-        .btn:hover {
-          border-color: var(--c, var(--blue));
-          background: white;
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        .item:hover {
+          background: var(--surface2);
+          border-color: var(--border);
         }
 
-        .btn.active {
-          border-color: var(--c, var(--blue));
-          background: white;
-          box-shadow: 0 0 0 3px color-mix(in srgb, var(--c, var(--blue)) 15%, transparent);
+        .item.active {
+          background: var(--surface);
+          border-color: var(--border2);
+          box-shadow: var(--shadow-sm);
         }
 
         .dot {
-          width: 8px; height: 8px;
+          width: 7px; height: 7px;
           border-radius: 50%;
           background: var(--c, var(--blue));
-          display: block;
-          margin-bottom: 4px;
+          flex-shrink: 0;
+          margin-top: 4px;
         }
 
-        .btn-label {
-          font-weight: 800;
+        .item-text { display: flex; flex-direction: column; gap: 1px; }
+
+        .item-name {
           font-size: 13px;
+          font-weight: 600;
           color: var(--text);
-          display: block;
-          line-height: 1.2;
+          line-height: 1.3;
         }
 
-        .btn-desc {
+        .item-desc {
           font-size: 11px;
           color: var(--muted);
-          display: block;
           line-height: 1.4;
         }
 
-        .run {
-          padding: 14px 20px;
+        .run-btn {
+          padding: 10px 16px;
           background: var(--text);
           color: white;
           border: none;
-          border-radius: var(--rsm);
+          border-radius: var(--radius-sm);
           font-family: var(--sans);
-          font-size: 15px;
-          font-weight: 800;
+          font-size: 14px;
+          font-weight: 600;
           cursor: pointer;
-          transition: all 0.18s;
+          transition: all 0.12s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
           margin-top: 4px;
-          letter-spacing: 0.2px;
         }
 
-        .run:hover:not(:disabled) {
-          background: #2e2a26;
-          transform: translateY(-1px);
-          box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+        .run-btn:hover:not(:disabled) {
+          background: #1f2937;
+          box-shadow: var(--shadow-md);
         }
 
-        .run:disabled { opacity: 0.45; cursor: not-allowed; }
+        .run-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-        .run.busy { background: var(--muted); }
-
-        .spinner {
-          display: inline-block;
-          width: 13px; height: 13px;
-          border: 2px solid rgba(255,255,255,0.4);
+        .spin {
+          width: 12px; height: 12px;
+          border: 2px solid rgba(255,255,255,0.3);
           border-top-color: white;
           border-radius: 50%;
           animation: spin 0.7s linear infinite;
-          vertical-align: middle;
-          margin-right: 6px;
+          display: inline-block;
         }
 
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        .hint {
+          font-size: 11px;
+          color: var(--faint);
+          text-align: center;
+        }
       `}</style>
     </div>
   );
