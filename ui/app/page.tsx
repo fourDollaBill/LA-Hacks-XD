@@ -7,6 +7,7 @@ import ForecastCard from "@/components/forecast-card";
 import InventoryCard from "@/components/inventory-card";
 import TransportCard from "@/components/transport-card";
 import DecisionCard from "@/components/decision-card";
+import TransportComparison from "@/components/transport-comparison";
 
 // ── Mock / baseline data ──────────────────────────────────────────────────────
 
@@ -224,6 +225,11 @@ export default function Home() {
                   <InventoryCard data={result.inventory} />
                   <TransportCard data={result.transport} />
                   <DecisionCard decision={result.decision} llmExplanation={result.llm_explanation} />
+                  <TransportComparison
+                    transport={result.transport}
+                    inventory={result.inventory}
+                    forecast={result.forecast}
+                  />
                 </div>
               ) : (
                 <div className="placeholder">
