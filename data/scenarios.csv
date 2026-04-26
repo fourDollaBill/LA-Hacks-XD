@@ -1,0 +1,6 @@
+scenario_name,label,color,description,total_units,expiring_soon,days_to_expiry,lead_time_truck,lead_time_intermodal,truck_cost_per_unit,intermodal_cost_per_unit,fuel_cost_index,reorder_threshold,order_max
+normal,Normal Operations,#22c55e,Steady demand and healthy inventory with standard fuel prices.,500,50,6,2,5,4.50,2.80,1.0,200,400
+high_demand,Demand Spike,#f59e0b,Demand surges — system increases order quantity and considers faster shipping.,300,40,5,2,5,4.50,2.80,1.0,200,600
+high_fuel,Fuel Price Surge,#ef4444,Fuel costs spike — system may switch to intermodal despite slower delivery.,450,30,8,2,5,4.50,2.80,2.1,200,400
+expiry_risk,Expiry Crisis,#8b5cf6,Large batch expiring soon — system prioritizes speed to minimize spoilage waste.,420,280,3,2,5,4.50,2.80,1.0,200,400
+low_stock,Critical Stock,#f97316,Inventory critically low with rising demand — urgent reorder triggered.,120,10,10,2,5,4.50,2.80,1.0,200,500
