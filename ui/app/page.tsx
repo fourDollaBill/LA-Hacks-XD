@@ -5,9 +5,7 @@ import { fetchScenarios, runScenario, Scenario, RunResult } from "@/lib/api";
 import ScenarioForm from "@/components/scenario-form";
 import ForecastCard from "@/components/forecast-card";
 import InventoryCard from "@/components/inventory-card";
-import TransportCard from "@/components/transport-card";
 import DecisionCard from "@/components/decision-card";
-import TransportComparison from "@/components/transport-comparison";
 
 // ── Mock / baseline data ──────────────────────────────────────────────────────
 
@@ -223,12 +221,12 @@ export default function Home() {
                 <div className="cards-grid fade-in">
                   <ForecastCard data={result.forecast} />
                   <InventoryCard data={result.inventory} />
-                  <TransportCard data={result.transport} />
-                  <DecisionCard decision={result.decision} llmExplanation={result.llm_explanation} />
-                  <TransportComparison
+                  <DecisionCard
+                    decision={result.decision}
                     transport={result.transport}
                     inventory={result.inventory}
                     forecast={result.forecast}
+                    llmExplanation={result.llm_explanation}
                   />
                 </div>
               ) : (
@@ -572,7 +570,7 @@ export default function Home() {
         .kpi-label{ font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 4px; }
         .kpi-delta{ font-size: 11px; font-weight: 700; margin-top: 6px; }
 
-        .cards-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+        .cards-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
         .placeholder { background: white; border: 2px dashed var(--border); border-radius: var(--radius); padding: 48px; display: flex; align-items: center; justify-content: center; text-align: center; flex-direction: column; }
         .ph-title { font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 8px; }
         .ph-sub   { font-size: 14px; color: var(--muted); font-weight: 600; max-width: 320px; }
