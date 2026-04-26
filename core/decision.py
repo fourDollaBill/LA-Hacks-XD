@@ -60,6 +60,7 @@ def run_decision(
         order_quantity=order_quantity,
         transport_method=transport_method,
         total_cost_score=total_cost,
+        confidence_score=75,
         reasoning=CostBreakdown(
             transport_cost=transport_cost,
             stockout_risk_cost=stockout_cost,
