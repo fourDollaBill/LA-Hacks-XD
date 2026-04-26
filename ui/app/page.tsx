@@ -2,26 +2,26 @@
 
 import { useEffect, useState } from "react";
 import { fetchScenarios, runScenario, Scenario, RunResult } from "@/lib/api";
-import ScenarioForm from "@/components/scenario-form";
-import ForecastCard from "@/components/forecast-card";
-import InventoryCard from "@/components/inventory-card";
-import DecisionCard from "@/components/decision-card";
+import ScenarioForm   from "@/components/scenario-form";
+import ForecastCard   from "@/components/forecast-card";
+import InventoryCard  from "@/components/inventory-card";
+import DecisionCard   from "@/components/decision-card";
 
-// ── Mock / baseline data ──────────────────────────────────────────────────────
+// ── Mock data ─────────────────────────────────────────────────────────────────
 
 const MOCK_KPI = [
-  { label: "Total Inventory",      value: "4,820", unit: "units",  delta: "+3.2%", up: true,  color: "#2e7de8", bg: "#e8f4fd" },
-  { label: "Avg Days to Stockout", value: "12.4",  unit: "days",   delta: "-1.1d", up: false, color: "#f0921a", bg: "#fff4e0" },
-  { label: "Spoilage This Week",   value: "2.3",   unit: "%",      delta: "-0.4%", up: true,  color: "#0d9e75", bg: "#e6f9ee" },
-  { label: "Reorders Pending",     value: "3",     unit: "active", delta: "+1",    up: false, color: "#7c5cbf", bg: "#f8f5ff" },
+  { label: "Total inventory",      value: "4,820", unit: "units",   delta: "+3.2%", up: true,  color: "#2563eb" },
+  { label: "Avg days to stockout", value: "12.4",  unit: "days",    delta: "-1.1d", up: false, color: "#d97706" },
+  { label: "Spoilage this week",   value: "2.3",   unit: "%",       delta: "-0.4%", up: true,  color: "#16a34a" },
+  { label: "Reorders pending",     value: "3",     unit: "active",  delta: "+1",    up: false, color: "#7c3aed" },
 ];
 
 const MOCK_INVENTORY = [
-  { sku: "PROD-A01", name: "Fresh Produce Batch A",  total: 1200, usable: 980,  expiring: 220, days: 8,  risk: "moderate" },
-  { sku: "PROD-B03", name: "Dairy Supply — Zone 3",  total: 850,  usable: 820,  expiring: 30,  days: 14, risk: "low"      },
-  { sku: "PROD-C07", name: "Frozen Goods Lot C7",    total: 2100, usable: 2100, expiring: 0,   days: 22, risk: "low"      },
-  { sku: "PROD-D12", name: "Med Supplies Batch D",   total: 420,  usable: 140,  expiring: 280, days: 3,  risk: "critical" },
-  { sku: "PROD-E05", name: "Bakery Items — East Hub",total: 250,  usable: 210,  expiring: 40,  days: 5,  risk: "high"     },
+  { sku: "PROD-A01", name: "Fresh Produce Batch A",   total: 1200, usable: 980,  expiring: 220, days: 8,  risk: "moderate" },
+  { sku: "PROD-B03", name: "Dairy Supply — Zone 3",   total: 850,  usable: 820,  expiring: 30,  days: 14, risk: "low"      },
+  { sku: "PROD-C07", name: "Frozen Goods Lot C7",     total: 2100, usable: 2100, expiring: 0,   days: 22, risk: "low"      },
+  { sku: "PROD-D12", name: "Med Supplies Batch D",    total: 420,  usable: 140,  expiring: 280, days: 3,  risk: "critical" },
+  { sku: "PROD-E05", name: "Bakery Items — East Hub", total: 250,  usable: 210,  expiring: 40,  days: 5,  risk: "high"     },
 ];
 
 const MOCK_PLANNING = [
@@ -38,30 +38,33 @@ const MOCK_RISKS = [
   { level: "low",      title: "PROD-A01 Reorder Approaching", desc: "Inventory expected to hit reorder threshold in 8 days.",                    time: "Yesterday" },
 ];
 
-// Stock policy rows — calculated from demand + lead times
-const MOCK_STOCK_POLICY = [
-  { sku: "PROD-A01", name: "Fresh Produce Batch A",  dailyDemand: 85,  leadTruck: 2, leadInter: 5, shelfLife: 8,  safetyDays: 2 },
-  { sku: "PROD-B03", name: "Dairy Supply — Zone 3",  dailyDemand: 60,  leadTruck: 2, leadInter: 5, shelfLife: 14, safetyDays: 3 },
-  { sku: "PROD-C07", name: "Frozen Goods Lot C7",    dailyDemand: 95,  leadTruck: 2, leadInter: 5, shelfLife: 30, safetyDays: 4 },
-  { sku: "PROD-D12", name: "Med Supplies Batch D",   dailyDemand: 45,  leadTruck: 2, leadInter: 5, shelfLife: 10, safetyDays: 3 },
-  { sku: "PROD-E05", name: "Bakery Items — East Hub",dailyDemand: 42,  leadTruck: 2, leadInter: 5, shelfLife: 5,  safetyDays: 1 },
-];
+const MOCK_STOCK = [
+  { sku: "PROD-A01", name: "Fresh Produce Batch A",   daily: 85,  lead: 2, safety: 2, shelf: 8  },
+  { sku: "PROD-B03", name: "Dairy Supply — Zone 3",   daily: 60,  lead: 2, safety: 3, shelf: 14 },
+  { sku: "PROD-C07", name: "Frozen Goods Lot C7",     daily: 95,  lead: 2, safety: 4, shelf: 30 },
+  { sku: "PROD-D12", name: "Med Supplies Batch D",    daily: 45,  lead: 2, safety: 3, shelf: 10 },
+  { sku: "PROD-E05", name: "Bakery Items — East Hub", daily: 42,  lead: 2, safety: 1, shelf: 5  },
+].map(r => {
+  const cycle    = r.daily * r.lead;
+  const safety   = r.daily * r.safety;
+  const min      = cycle + safety;
+  const max      = Math.min(r.daily * (5 + r.safety + 3), r.daily * r.shelf);
+  return { ...r, cycle, safety, min, max, orderQty: max - min };
+});
 
-const RISK_STYLE: Record<string, { bg: string; color: string; border: string; label: string }> = {
-  critical: { bg: "#fdeaea", color: "#b91c1c", border: "#fca5a5", label: "Critical" },
-  high:     { bg: "#fff0e8", color: "#c24a10", border: "#fdba74", label: "High"     },
-  moderate: { bg: "#fff4e0", color: "#c47a00", border: "#fcd34d", label: "Moderate" },
-  low:      { bg: "#e6f9ee", color: "#1a7a3c", border: "#86efac", label: "Low"      },
+const RISK_STYLE: Record<string, { bg: string; color: string; label: string }> = {
+  critical: { bg: "var(--red-bg)",    color: "var(--red)",    label: "Critical" },
+  high:     { bg: "#fff7ed",          color: "#c2410c",        label: "High"     },
+  moderate: { bg: "var(--amber-bg)",  color: "var(--amber)",  label: "Moderate" },
+  low:      { bg: "var(--green-bg)",  color: "var(--green)",  label: "Low"      },
 };
 
-// ── Pipeline ──────────────────────────────────────────────────────────────────
-
 const PIPELINE = [
-  { id: "forecast",  label: "ForecastAgent", icon: "📈", color: "#e8f4fd", text: "#1a6aa8" },
-  { id: "inventory", label: "InventoryAgent",icon: "📦", color: "#e6f9ee", text: "#1a7a3c" },
-  { id: "transport", label: "TransportAgent",icon: "🚚", color: "#fff4e0", text: "#c47a00" },
-  { id: "decision",  label: "DecisionAgent", icon: "🧠", color: "#f8f5ff", text: "#7c5cbf" },
-  { id: "llm",       label: "LLM Explainer", icon: "💬", color: "#fdeaea", text: "#b91c1c" },
+  { id: "forecast",  label: "ForecastAgent",  icon: "📈", ai: true  },
+  { id: "inventory", label: "InventoryAgent", icon: "📦", ai: false },
+  { id: "transport", label: "TransportAgent", icon: "🚚", ai: false },
+  { id: "decision",  label: "DecisionAgent",  icon: "🧠", ai: true  },
+  { id: "llm",       label: "LLM Summary",    icon: "💬", ai: true  },
 ];
 
 type PStep = "idle" | "active" | "done";
@@ -74,130 +77,120 @@ export default function Home() {
   const [selected,  setSelected]  = useState<string | null>(null);
   const [loading,   setLoading]   = useState(false);
   const [result,    setResult]    = useState<RunResult | null>(null);
-  const [pipeState, setPipeState] = useState<Record<string, PStep>>({});
-  const [statusMsg, setStatusMsg] = useState("");
+  const [pipe,      setPipe]      = useState<Record<string, PStep>>({});
+  const [status,    setStatus]    = useState("");
   const [error,     setError]     = useState<string | null>(null);
   const [tab,       setTab]       = useState<Tab>("overview");
 
   useEffect(() => {
     fetchScenarios()
-      .then((s) => { setScenarios(s); if (s.length) setSelected(s[0].name); })
-      .catch(() => setError("Can't reach the backend — run: uvicorn main:app --port 8000"));
+      .then(s => { setScenarios(s); if (s.length) setSelected(s[0].name); })
+      .catch(() => setError("Backend unreachable — run: uvicorn main:app --port 8000"));
   }, []);
 
   async function handleRun() {
     if (!selected) return;
-    setLoading(true); setResult(null); setError(null); setPipeState({}); setTab("overview");
+    setLoading(true); setResult(null); setError(null); setPipe({}); setTab("overview");
+
     for (let i = 0; i < PIPELINE.length; i++) {
-      setPipeState((p) => ({ ...p, [PIPELINE[i].id]: "active" }));
-      setStatusMsg(`Running ${PIPELINE[i].label}…`);
-      await delay(380);
-      setPipeState((p) => ({ ...p, [PIPELINE[i].id]: "done" }));
+      setPipe(p => ({ ...p, [PIPELINE[i].id]: "active" }));
+      setStatus(`${PIPELINE[i].label}${PIPELINE[i].ai ? " is reasoning…" : " running…"}`);
+      await delay(PIPELINE[i].ai ? 500 : 300);
+      setPipe(p => ({ ...p, [PIPELINE[i].id]: "done" }));
     }
+
     try {
       const data = await runScenario(selected);
       setResult(data);
-      setStatusMsg("All agents finished ✓");
+      setStatus("Analysis complete");
     } catch {
-      setError("Something went wrong. Is the backend running?");
-      setStatusMsg(""); setPipeState({});
+      setError("Failed to run. Is the backend running?");
+      setStatus(""); setPipe({});
     } finally { setLoading(false); }
   }
 
-  // ── Stock policy calculation ──────────────────────────────────────────────
-  // If agents ran, use their demand; otherwise use mock baselines
-  const stockRows = MOCK_STOCK_POLICY.map((item) => {
-    const daily = (result && item.sku === "PROD-A01")
-      ? result.forecast.predicted_demand
-      : item.dailyDemand;
-    const cycleStock   = daily * item.leadTruck;             // cover truck lead time
-    const safetyStock  = daily * item.safetyDays;            // buffer for demand spikes
-    const minStock     = cycleStock + safetyStock;           // reorder point
-    const maxStock     = Math.min(daily * (item.leadInter + item.safetyDays + 3), daily * item.shelfLife);
-    const reorderPoint = minStock;
-    const orderQty     = maxStock - minStock;
-    return { ...item, daily, cycleStock, safetyStock, minStock, maxStock, reorderPoint, orderQty };
-  });
-
   const TABS: { id: Tab; label: string; badge?: string }[] = [
-    { id: "overview",  label: "📊 Overview"      },
-    { id: "inventory", label: "📦 Inventory"     },
-    { id: "planning",  label: "📋 Planning"      },
-    { id: "stock",     label: "📐 Stock Policy"  },
-    { id: "risk",      label: "⚠️ Risk Monitor", badge: "1" },
+    { id: "overview",  label: "Overview"      },
+    { id: "inventory", label: "Inventory"     },
+    { id: "planning",  label: "Planning"      },
+    { id: "stock",     label: "Stock Policy"  },
+    { id: "risk",      label: "Risk Monitor", badge: "1" },
   ];
 
   return (
     <div className="page">
 
-      {/* Header */}
+      {/* ── Header ── */}
       <header>
         <div className="hinner">
-          <div className="logo">
-            <div className="logo-mark">SM</div>
-            <div>
-              <div className="logo-name">SupplyMind</div>
-              <div className="logo-sub">Multi-Agent Supply Chain Optimizer</div>
+          <div className="hleft">
+            <div className="logo">
+              <div className="logo-icon">SM</div>
+              <div>
+                <div className="logo-name">SupplyMind</div>
+              </div>
             </div>
+            <span className="beta-badge">Beta</span>
+            <div className="nav-divider" />
+            <span className="nav-item active-nav">Dashboard</span>
           </div>
           <div className="hright">
-            <div className="stat-pill">
-              <span style={{ color: "#0d9e75", fontWeight: 800 }}>4,820</span> units tracked
+            <div className="status-dot-wrap">
+              <span className="status-dot" />
+              <span className="status-text">5 agents ready</span>
             </div>
-            <div className="stat-pill" style={{ background: "#fdeaea", color: "#b91c1c" }}>
-              <span style={{ fontWeight: 800 }}>1</span> critical alert
-            </div>
-            <div className="live-badge">
-              <span className="live-dot" /> 5 agents online
-            </div>
+            <div className="header-btn">Documentation</div>
           </div>
         </div>
       </header>
 
-      <div className="body">
+      <div className="layout">
 
-        {/* Sidebar */}
+        {/* ── Sidebar ── */}
         <aside>
-          <ScenarioForm
-            scenarios={scenarios} selected={selected}
-            loading={loading} onSelect={setSelected} onRun={handleRun}
-          />
-        </aside>
+          <div className="aside-section">
+            <ScenarioForm
+              scenarios={scenarios} selected={selected}
+              loading={loading} onSelect={setSelected} onRun={handleRun}
+            />
+          </div>
 
-        {/* Main */}
-        <main>
-
-          {/* Pipeline */}
-          <div className="card">
-            <div className="sec-label">Agent Pipeline</div>
-            <div className="pipeline">
-              {PIPELINE.map((s, i) => {
-                const state = pipeState[s.id] || "idle";
+          {/* Pipeline status in sidebar */}
+          <div className="aside-section">
+            <div className="aside-label">Agent pipeline</div>
+            <div className="pipe-list">
+              {PIPELINE.map((s) => {
+                const state = pipe[s.id] || "idle";
                 return (
-                  <div key={s.id} style={{ display: "flex", alignItems: "center" }}>
-                    <div className="pnode" style={state !== "idle" ? { background: s.color, borderColor: "transparent", color: s.text } : {}}>
-                      <span>{s.icon}</span><span>{s.label}</span>
-                      {state === "done"   && <span style={{ color: s.text }}>✓</span>}
-                      {state === "active" && <span className="pspinner" />}
+                  <div key={s.id} className={`pipe-item pipe-${state}`}>
+                    <div className="pipe-dot-wrap">
+                      <div className={`pipe-dot ${state === "active" ? "pipe-dot-active" : state === "done" ? "pipe-dot-done" : ""}`} />
+                      {s.id !== "llm" && <div className="pipe-line" />}
                     </div>
-                    {i < PIPELINE.length - 1 && (
-                      <span className={`parrow ${state === "done" ? "lit" : ""}`}>→</span>
-                    )}
+                    <div className="pipe-info">
+                      <span className="pipe-name">{s.icon} {s.label}</span>
+                      {s.ai && <span className="pipe-ai">AI</span>}
+                    </div>
+                    {state === "done" && <span className="pipe-check">✓</span>}
+                    {state === "active" && <span className="pipe-spin" />}
                   </div>
                 );
               })}
             </div>
-            {statusMsg && <p className="status-msg">{statusMsg}</p>}
+            {status && <div className="pipe-status">{status}</div>}
           </div>
+        </aside>
 
-          {error && <div className="error-box">{error}</div>}
+        {/* ── Main ── */}
+        <main>
+          {error && <div className="error-bar">{error}</div>}
 
           {/* Tabs */}
-          <div className="tabs">
-            {TABS.map((t) => (
+          <div className="tabs-wrap">
+            {TABS.map(t => (
               <button key={t.id} className={`tab ${tab === t.id ? "tab-on" : ""}`} onClick={() => setTab(t.id)}>
                 {t.label}
-                {t.badge && <span className="tbadge">{t.badge}</span>}
+                {t.badge && <span className="tab-badge">{t.badge}</span>}
               </button>
             ))}
           </div>
@@ -205,20 +198,20 @@ export default function Home() {
           {/* ── OVERVIEW ── */}
           {tab === "overview" && (
             <div className="tcontent">
-              <div className="kpi-grid">
-                {MOCK_KPI.map((k) => (
+              <div className="kpi-row">
+                {MOCK_KPI.map(k => (
                   <div key={k.label} className="kpi-card" style={{ borderTopColor: k.color }}>
-                    <div className="kpi-dot" style={{ background: k.bg }}>
-                      <div style={{ width: 10, height: 10, borderRadius: "50%", background: k.color }} />
-                    </div>
-                    <div className="kpi-val">{k.value} <span className="kpi-unit">{k.unit}</span></div>
+                    <div className="kpi-val">{k.value}<span className="kpi-unit"> {k.unit}</span></div>
                     <div className="kpi-label">{k.label}</div>
-                    <div className="kpi-delta" style={{ color: k.up ? "#0d9e75" : "#e84c3d" }}>{k.delta} vs last week</div>
+                    <div className="kpi-delta" style={{ color: k.up ? "var(--green)" : "var(--red)" }}>
+                      {k.delta} vs last week
+                    </div>
                   </div>
                 ))}
               </div>
+
               {result ? (
-                <div className="cards-grid fade-in">
+                <div className="results-grid fade-in">
                   <ForecastCard data={result.forecast} />
                   <InventoryCard data={result.inventory} />
                   <DecisionCard
@@ -230,10 +223,10 @@ export default function Home() {
                   />
                 </div>
               ) : (
-                <div className="placeholder">
-                  <div style={{ fontSize: 40, marginBottom: 12 }}>🤖</div>
-                  <div className="ph-title">Agent outputs appear here</div>
-                  <div className="ph-sub">Select a scenario on the left and click Run all agents.</div>
+                <div className="empty-state">
+                  <div className="empty-icon">⬡</div>
+                  <div className="empty-title">No analysis yet</div>
+                  <div className="empty-sub">Select a scenario and run the agent pipeline to see results.</div>
                 </div>
               )}
             </div>
@@ -242,35 +235,33 @@ export default function Home() {
           {/* ── INVENTORY ── */}
           {tab === "inventory" && (
             <div className="tcontent fade-in">
-              <div className="sheader">
+              <div className="section-header">
                 <div>
-                  <div className="stitle">Inventory Monitor</div>
-                  <div className="ssub">Live stock levels, expiry tracking, and usability across all SKUs</div>
+                  <div className="section-title">Inventory Monitor</div>
+                  <div className="section-sub">Stock levels, expiry tracking, and risk across all SKUs</div>
                 </div>
-                <div className="sbadge" style={{ background: "#e8f4fd", color: "#1a6aa8" }}>{MOCK_INVENTORY.length} SKUs tracked</div>
+                <span className="section-badge" style={{ background: "var(--blue-bg)", color: "var(--blue)", borderColor: "var(--blue-border)" }}>{MOCK_INVENTORY.length} SKUs</span>
               </div>
-              <div className="inv-table">
-                <div className="inv-head">
-                  <span>SKU</span><span>Product</span><span>Total</span>
-                  <span>Usable</span><span>Expiring</span><span>Days</span><span>Risk</span>
+              <div className="table-wrap">
+                <div className="table-head inv-cols">
+                  <span>SKU</span><span>Product</span><span>Usable</span><span>Expiring</span><span>Days left</span><span>Risk</span>
                 </div>
-                {MOCK_INVENTORY.map((item) => {
+                {MOCK_INVENTORY.map(item => {
                   const r = RISK_STYLE[item.risk];
                   const pct = Math.round((item.usable / item.total) * 100);
                   return (
-                    <div key={item.sku} className="inv-row">
-                      <span className="sku">{item.sku}</span>
-                      <span className="inv-name">{item.name}</span>
-                      <span className="mono">{item.total.toLocaleString()}</span>
+                    <div key={item.sku} className="table-row inv-cols">
+                      <span className="mono-tag">{item.sku}</span>
+                      <span className="row-name">{item.name}</span>
                       <div>
-                        <div className="bar-track"><div className="bar-fill" style={{ width: `${pct}%` }} /></div>
-                        <span className="mono">{item.usable.toLocaleString()}</span>
+                        <div className="mini-bar"><div className="mini-fill" style={{ width: `${pct}%` }} /></div>
+                        <span className="mono-val">{item.usable.toLocaleString()}</span>
                       </div>
-                      <span className="mono" style={{ color: item.expiring > 0 ? r.color : "var(--muted)" }}>
-                        {item.expiring > 0 ? item.expiring.toLocaleString() : "—"}
+                      <span className="mono-val" style={{ color: item.expiring > 0 ? r.color : "var(--faint)" }}>
+                        {item.expiring > 0 ? item.expiring : "—"}
                       </span>
-                      <span className="mono" style={{ fontWeight: 800, color: item.days <= 5 ? r.color : "var(--text)" }}>{item.days}d</span>
-                      <span className="chip" style={{ background: r.bg, color: r.color }}>{r.label}</span>
+                      <span className="mono-val" style={{ fontWeight: 600, color: item.days <= 5 ? r.color : "var(--text)" }}>{item.days}d</span>
+                      <span className="badge" style={{ background: r.bg, color: r.color }}>{r.label}</span>
                     </div>
                   );
                 })}
@@ -281,44 +272,39 @@ export default function Home() {
           {/* ── PLANNING ── */}
           {tab === "planning" && (
             <div className="tcontent fade-in">
-              <div className="sheader">
+              <div className="section-header">
                 <div>
-                  <div className="stitle">Reorder Planning</div>
-                  <div className="ssub">Active purchase orders, ETAs, and shipping methods</div>
+                  <div className="section-title">Reorder Planning</div>
+                  <div className="section-sub">Active purchase orders, ETAs, and transport methods</div>
                 </div>
-                <div className="sbadge" style={{ background: "#e6f9ee", color: "#1a7a3c" }}>{MOCK_PLANNING.length} active orders</div>
+                <span className="section-badge" style={{ background: "var(--green-bg)", color: "var(--green)", borderColor: "var(--green-border)" }}>{MOCK_PLANNING.length} orders</span>
               </div>
               <div className="plan-grid">
-                {MOCK_PLANNING.map((p) => {
+                {MOCK_PLANNING.map(p => {
                   const ss: Record<string,{bg:string;color:string}> = {
-                    urgent:       { bg: "#fdeaea", color: "#b91c1c" },
-                    scheduled:    { bg: "#e8f4fd", color: "#1a6aa8" },
-                    "in-transit": { bg: "#e6f9ee", color: "#1a7a3c" },
+                    urgent:       { bg:"var(--red-bg)",    color:"var(--red)"    },
+                    scheduled:    { bg:"var(--blue-bg)",   color:"var(--blue)"   },
+                    "in-transit": { bg:"var(--green-bg)",  color:"var(--green)"  },
                   };
                   const s = ss[p.status] || ss.scheduled;
                   return (
-                    <div key={p.id} className="plan-card" style={{ borderLeftColor: s.color }}>
+                    <div key={p.id} className="plan-card">
                       <div className="plan-top">
                         <div>
-                          <span className="plan-id">{p.id}</span>
-                          <span className="plan-sku">{p.sku}</span>
+                          <div className="plan-id">{p.id} · {p.sku}</div>
+                          <div className="plan-method">{p.method}</div>
                         </div>
-                        <span className="chip" style={{ background: s.bg, color: s.color }}>{p.status}</span>
+                        <span className="badge" style={{ background: s.bg, color: s.color }}>{p.status}</span>
                       </div>
-                      <div className="plan-details">
-                        {[["Quantity", `${p.qty} units`],["Method", p.method],["ETA", p.eta],["Est. Cost", p.cost]].map(([l,v]) => (
-                          <div key={l} className="plan-detail">
-                            <span className="dlabel">{l}</span>
-                            <span className="dval" style={{ color: l==="Est. Cost" ? "#0d9e75" : l==="ETA" && v==="Tomorrow" ? "#b91c1c" : "var(--text)" }}>{v}</span>
-                          </div>
-                        ))}
-                      </div>
+                      <div className="plan-row"><span>Quantity</span><strong>{p.qty} units</strong></div>
+                      <div className="plan-row"><span>ETA</span><strong style={{ color: p.eta === "Tomorrow" ? "var(--red)" : "var(--text)" }}>{p.eta}</strong></div>
+                      <div className="plan-row"><span>Est. cost</span><strong style={{ color: "var(--green)" }}>{p.cost}</strong></div>
                     </div>
                   );
                 })}
               </div>
-              <div className="sum-grid">
-                {[["$4,960","Total pending spend"],["1,400","Units in transit"],["2","Truck shipments"],["2","Intermodal shipments"]].map(([v,l]) => (
+              <div className="summary-row">
+                {[["$4,960","Total spend"],["1,400","Units in transit"],["2","Truck"],["2","Intermodal"]].map(([v,l]) => (
                   <div key={l} className="sum-item"><div className="sum-val">{v}</div><div className="sum-label">{l}</div></div>
                 ))}
               </div>
@@ -328,155 +314,84 @@ export default function Home() {
           {/* ── STOCK POLICY ── */}
           {tab === "stock" && (
             <div className="tcontent fade-in">
-              <div className="sheader">
+              <div className="section-header">
                 <div>
-                  <div className="stitle">Stock Policy Recommendations</div>
-                  <div className="ssub">
-                    How much stock to keep on hand for each SKU based on current demand, lead times, and shelf life.
-                    {result && <span style={{ color: "#0d9e75", fontWeight: 700 }}> Updated with latest agent data.</span>}
-                  </div>
+                  <div className="section-title">Stock Policy</div>
+                  <div className="section-sub">How much to keep on hand per SKU based on demand, lead times, and shelf life</div>
                 </div>
-                <div className="sbadge" style={{ background: "#f8f5ff", color: "#7c5cbf" }}>Based on live demand</div>
+                <span className="section-badge" style={{ background: "var(--purple-bg)", color: "var(--purple)", borderColor: "var(--purple-border)" }}>Live demand</span>
               </div>
 
-              {/* Formula explainer */}
-              <div className="formula-box">
-                <div className="formula-title">How it's calculated</div>
-                <div className="formula-grid">
-                  <div className="formula-item" style={{ borderTopColor: "#2e7de8" }}>
-                    <div className="formula-name">Cycle Stock</div>
-                    <div className="formula-eq">Daily demand × Truck lead time</div>
-                    <div className="formula-desc">Units needed to cover the fastest reorder window</div>
+              <div className="formula-row">
+                {[
+                  { name: "Cycle Stock", eq: "Daily × Lead time", color: "#2563eb", desc: "Cover fastest reorder" },
+                  { name: "Safety Stock", eq: "Daily × Buffer days", color: "#d97706", desc: "Absorb demand spikes" },
+                  { name: "Reorder Point", eq: "Cycle + Safety", color: "#16a34a", desc: "Order when you hit this" },
+                  { name: "Max Stock", eq: "Capped by shelf life", color: "#7c3aed", desc: "Never hold more than this" },
+                ].map(f => (
+                  <div key={f.name} className="formula-card" style={{ borderTopColor: f.color }}>
+                    <div className="formula-name">{f.name}</div>
+                    <code className="formula-eq">{f.eq}</code>
+                    <div className="formula-desc">{f.desc}</div>
                   </div>
-                  <div className="formula-item" style={{ borderTopColor: "#f0921a" }}>
-                    <div className="formula-name">Safety Stock</div>
-                    <div className="formula-eq">Daily demand × Safety days buffer</div>
-                    <div className="formula-desc">Extra buffer for demand spikes or delivery delays</div>
-                  </div>
-                  <div className="formula-item" style={{ borderTopColor: "#0d9e75" }}>
-                    <div className="formula-name">Reorder Point</div>
-                    <div className="formula-eq">Cycle stock + Safety stock</div>
-                    <div className="formula-desc">Place a new order when stock hits this level</div>
-                  </div>
-                  <div className="formula-item" style={{ borderTopColor: "#7c5cbf" }}>
-                    <div className="formula-name">Max Stock</div>
-                    <div className="formula-eq">Capped by shelf life × daily demand</div>
-                    <div className="formula-desc">Never hold more than this — spoilage risk too high</div>
-                  </div>
-                </div>
+                ))}
               </div>
 
-              {/* Stock policy table */}
-              <div className="inv-table">
-                <div className="sp-head">
-                  <span>SKU</span>
-                  <span>Daily Demand</span>
-                  <span>Cycle Stock</span>
-                  <span>Safety Stock</span>
-                  <span>Reorder Point</span>
-                  <span>Max Stock</span>
-                  <span>Order Qty</span>
-                  <span>Shelf Life</span>
+              <div className="table-wrap">
+                <div className="table-head sp-cols">
+                  <span>SKU</span><span>Daily</span><span>Cycle stock</span><span>Safety stock</span>
+                  <span>Reorder point</span><span>Max stock</span><span>Order qty</span>
                 </div>
-                {stockRows.map((row) => {
-                  const tight = row.minStock > row.maxStock * 0.85;
-                  return (
-                    <div key={row.sku} className="sp-row">
-                      <div>
-                        <div className="sku">{row.sku}</div>
-                        <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600 }}>{row.name}</div>
-                      </div>
-                      <div className="sp-cell">
-                        <span className="sp-val">{row.daily}</span>
-                        <span className="sp-unit">units/day</span>
-                      </div>
-                      <div className="sp-cell">
-                        <span className="sp-val" style={{ color: "#2e7de8" }}>{row.cycleStock}</span>
-                        <span className="sp-unit">units</span>
-                      </div>
-                      <div className="sp-cell">
-                        <span className="sp-val" style={{ color: "#f0921a" }}>{row.safetyStock}</span>
-                        <span className="sp-unit">units</span>
-                      </div>
-                      <div className="sp-cell">
-                        <div className="sp-highlight" style={{ background: "#e8f4fd", color: "#1a6aa8" }}>
-                          {row.reorderPoint} units
-                        </div>
-                      </div>
-                      <div className="sp-cell">
-                        <div className="sp-highlight" style={{ background: tight ? "#fdeaea" : "#e6f9ee", color: tight ? "#b91c1c" : "#1a7a3c" }}>
-                          {row.maxStock} units
-                        </div>
-                      </div>
-                      <div className="sp-cell">
-                        <span className="sp-val">{row.orderQty}</span>
-                        <span className="sp-unit">units/order</span>
-                      </div>
-                      <div className="sp-cell">
-                        <span className="sp-val" style={{ color: row.shelfLife <= 5 ? "#b91c1c" : "var(--text)" }}>{row.shelfLife}d</span>
-                        <span className="sp-unit">shelf life</span>
-                      </div>
+                {MOCK_STOCK.map(row => (
+                  <div key={row.sku} className="table-row sp-cols">
+                    <div>
+                      <div className="mono-tag">{row.sku}</div>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{row.name}</div>
                     </div>
-                  );
-                })}
+                    <span className="mono-val">{row.daily}<span style={{fontSize:10,color:"var(--muted)"}}>/d</span></span>
+                    <span className="mono-val" style={{ color: "#2563eb" }}>{row.cycle}</span>
+                    <span className="mono-val" style={{ color: "#d97706" }}>{row.safety}</span>
+                    <span className="sp-highlight" style={{ background: "var(--blue-bg)", color: "var(--blue)" }}>{row.min}</span>
+                    <span className="sp-highlight" style={{ background: row.min > row.max * 0.85 ? "var(--red-bg)" : "var(--green-bg)", color: row.min > row.max * 0.85 ? "var(--red)" : "var(--green)" }}>{row.max}</span>
+                    <span className="mono-val">{row.orderQty}</span>
+                  </div>
+                ))}
               </div>
 
-              {/* Insight cards */}
-              <div className="insight-grid">
-                <div className="insight-card" style={{ borderLeftColor: "#2e7de8" }}>
-                  <div className="insight-title">Total min. stock needed</div>
-                  <div className="insight-val" style={{ color: "#2e7de8" }}>
-                    {stockRows.reduce((s, r) => s + r.minStock, 0).toLocaleString()}
-                    <span className="insight-unit"> units</span>
+              <div className="insight-row">
+                {[
+                  { label: "Total min. stock needed", val: MOCK_STOCK.reduce((s,r)=>s+r.min,0).toLocaleString(), unit: "units", color: "#2563eb" },
+                  { label: "Total max. allowed", val: MOCK_STOCK.reduce((s,r)=>s+r.max,0).toLocaleString(), unit: "units", color: "#16a34a" },
+                  { label: "Highest demand SKU", val: [...MOCK_STOCK].sort((a,b)=>b.daily-a.daily)[0].sku, unit: `${[...MOCK_STOCK].sort((a,b)=>b.daily-a.daily)[0].daily}/day`, color: "#d97706" },
+                  { label: "Tightest shelf life", val: [...MOCK_STOCK].sort((a,b)=>a.shelf-b.shelf)[0].sku, unit: `${[...MOCK_STOCK].sort((a,b)=>a.shelf-b.shelf)[0].shelf}d shelf life`, color: "#dc2626" },
+                ].map(i => (
+                  <div key={i.label} className="insight-card" style={{ borderLeftColor: i.color }}>
+                    <div className="insight-label">{i.label}</div>
+                    <div className="insight-val" style={{ color: i.color }}>{i.val} <span>{i.unit}</span></div>
                   </div>
-                  <div className="insight-desc">Sum of all reorder points across SKUs</div>
-                </div>
-                <div className="insight-card" style={{ borderLeftColor: "#0d9e75" }}>
-                  <div className="insight-title">Total max. stock allowed</div>
-                  <div className="insight-val" style={{ color: "#0d9e75" }}>
-                    {stockRows.reduce((s, r) => s + r.maxStock, 0).toLocaleString()}
-                    <span className="insight-unit"> units</span>
-                  </div>
-                  <div className="insight-desc">Upper limit before spoilage risk rises</div>
-                </div>
-                <div className="insight-card" style={{ borderLeftColor: "#f0921a" }}>
-                  <div className="insight-title">Highest daily demand SKU</div>
-                  <div className="insight-val" style={{ color: "#f0921a" }}>
-                    {stockRows.sort((a,b) => b.daily - a.daily)[0].sku}
-                    <span className="insight-unit"> {stockRows[0].daily} units/day</span>
-                  </div>
-                  <div className="insight-desc">Needs most frequent reordering</div>
-                </div>
-                <div className="insight-card" style={{ borderLeftColor: "#e84c3d" }}>
-                  <div className="insight-title">Tightest shelf life</div>
-                  <div className="insight-val" style={{ color: "#e84c3d" }}>
-                    {[...stockRows].sort((a,b) => a.shelfLife - b.shelfLife)[0].sku}
-                    <span className="insight-unit"> {[...stockRows].sort((a,b) => a.shelfLife - b.shelfLife)[0].shelfLife}d shelf life</span>
-                  </div>
-                  <div className="insight-desc">Most sensitive to shipping delays</div>
-                </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* ── RISK MONITOR ── */}
+          {/* ── RISK ── */}
           {tab === "risk" && (
             <div className="tcontent fade-in">
-              <div className="sheader">
+              <div className="section-header">
                 <div>
-                  <div className="stitle">Risk Monitor</div>
-                  <div className="ssub">Active alerts ranked by severity across inventory, transport, and demand</div>
+                  <div className="section-title">Risk Monitor</div>
+                  <div className="section-sub">Active alerts ranked by severity</div>
                 </div>
-                <div className="sbadge" style={{ background: "#fdeaea", color: "#b91c1c" }}>1 critical</div>
+                <span className="section-badge" style={{ background: "var(--red-bg)", color: "var(--red)", borderColor: "var(--red-border)" }}>1 critical</span>
               </div>
               <div className="risk-list">
                 {MOCK_RISKS.map((r, i) => {
                   const rs = RISK_STYLE[r.level];
                   return (
-                    <div key={i} className="risk-item" style={{ borderLeftColor: rs.color }}>
+                    <div key={i} className="risk-card" style={{ borderLeftColor: rs.color }}>
                       <div className="risk-top">
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <span className="chip" style={{ background: rs.bg, color: rs.color }}>{rs.label}</span>
+                        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                          <span className="badge" style={{ background:rs.bg, color:rs.color }}>{rs.label}</span>
                           <span className="risk-title">{r.title}</span>
                         </div>
                         <span className="risk-time">{r.time}</span>
@@ -486,19 +401,16 @@ export default function Home() {
                   );
                 })}
               </div>
-              <div className="card" style={{ padding: 20 }}>
-                <div className="sec-label" style={{ marginBottom: 12 }}>Risk Summary</div>
-                <div className="risk-sum-grid">
-                  {Object.entries(RISK_STYLE).map(([level, rs]) => {
-                    const count = MOCK_RISKS.filter(r => r.level === level).length;
-                    return (
-                      <div key={level} className="risk-sum-item" style={{ background: rs.bg, borderColor: rs.border }}>
-                        <div className="risk-sum-count" style={{ color: rs.color }}>{count}</div>
-                        <div className="risk-sum-label" style={{ color: rs.color }}>{rs.label}</div>
-                      </div>
-                    );
-                  })}
-                </div>
+              <div className="risk-sum-grid">
+                {Object.entries(RISK_STYLE).map(([level, rs]) => {
+                  const count = MOCK_RISKS.filter(r=>r.level===level).length;
+                  return (
+                    <div key={level} className="risk-sum" style={{ background:rs.bg, borderColor: level==="critical" ? "var(--red-border)" : level==="high" ? "#fed7aa" : level==="moderate" ? "var(--amber-border)" : "var(--green-border)" }}>
+                      <div className="risk-sum-n" style={{ color:rs.color }}>{count}</div>
+                      <div className="risk-sum-l" style={{ color:rs.color }}>{rs.label}</div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -507,160 +419,181 @@ export default function Home() {
       </div>
 
       <style jsx>{`
-        .page { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
+        .page { min-height: 100vh; display: flex; flex-direction: column; }
 
+        /* Header */
         header {
-          background: white; border-bottom: 2px solid var(--border);
-          padding: 0 28px; height: 64px; display: flex; align-items: center;
+          height: 52px; background: var(--surface);
+          border-bottom: 1px solid var(--border);
+          padding: 0 20px; display: flex; align-items: center;
           position: sticky; top: 0; z-index: 50;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+          box-shadow: var(--shadow-sm);
         }
         .hinner { width: 100%; display: flex; justify-content: space-between; align-items: center; }
-        .logo   { display: flex; align-items: center; gap: 12px; }
-        .logo-mark {
-          width: 38px; height: 38px; background: var(--text); border-radius: 10px;
+        .hleft  { display: flex; align-items: center; gap: 12px; }
+        .logo   { display: flex; align-items: center; gap: 8px; }
+        .logo-icon {
+          width: 28px; height: 28px; background: var(--text); border-radius: 7px;
           display: flex; align-items: center; justify-content: center;
-          font-family: var(--mono); font-size: 13px; font-weight: 500; color: white;
+          font-family: var(--mono); font-size: 11px; font-weight: 500; color: white;
         }
-        .logo-name { font-weight: 800; font-size: 17px; color: var(--text); line-height: 1.2; }
-        .logo-sub  { font-size: 11px; color: var(--muted); font-weight: 600; }
+        .logo-name { font-size: 14px; font-weight: 700; color: var(--text); }
+        .beta-badge {
+          font-size: 11px; font-weight: 600; color: var(--purple);
+          background: var(--purple-bg); border: 1px solid var(--purple-border);
+          padding: 1px 8px; border-radius: 20px;
+        }
+        .nav-divider { width: 1px; height: 16px; background: var(--border); }
+        .nav-item { font-size: 13px; color: var(--muted); font-weight: 500; }
+        .active-nav { color: var(--text); font-weight: 600; }
         .hright { display: flex; align-items: center; gap: 10px; }
-        .stat-pill { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #e6f9ee; color: #1a7a3c; }
-        .live-badge { display: flex; align-items: center; gap: 7px; padding: 6px 14px; background: #e6f9ee; border-radius: 20px; font-size: 13px; font-weight: 700; color: #1a7a3c; }
-        .live-dot { width: 7px; height: 7px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; display: inline-block; }
-        @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(0.7);opacity:0.5} }
+        .status-dot-wrap { display: flex; align-items: center; gap: 6px; }
+        .status-dot { width: 7px; height: 7px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }
+        .status-text { font-size: 12px; color: var(--muted); font-weight: 500; }
+        .header-btn { font-size: 12px; font-weight: 500; color: var(--muted); padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--radius-xs); cursor: pointer; transition: all 0.1s; }
+        .header-btn:hover { background: var(--surface2); color: var(--text); }
 
-        .body {
-          flex: 1; display: grid; grid-template-columns: 290px 1fr;
-          max-width: 1440px; margin: 0 auto; width: 100%;
-          padding: 24px 28px; gap: 24px; align-items: start;
+        /* Layout */
+        .layout { flex: 1; display: grid; grid-template-columns: 240px 1fr; max-width: 1400px; margin: 0 auto; width: 100%; padding: 20px; gap: 20px; align-items: start; }
+
+        aside {
+          position: sticky; top: 72px;
+          display: flex; flex-direction: column; gap: 0;
+          background: var(--surface); border: 1px solid var(--border);
+          border-radius: var(--radius); overflow: hidden;
+          box-shadow: var(--shadow-sm);
         }
-        aside { position: sticky; top: 88px; background: white; border: 2px solid var(--border); border-radius: var(--radius); padding: 20px; }
-        main  { display: flex; flex-direction: column; gap: 16px; }
+        .aside-section { padding: 16px; border-bottom: 1px solid var(--border); }
+        .aside-section:last-child { border-bottom: none; }
+        .aside-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
 
-        .card { background: white; border: 2px solid var(--border); border-radius: var(--radius); padding: 16px 20px; }
-        .sec-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
-
-        /* Pipeline */
-        .pipeline { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
-        .pnode { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: 2px solid var(--border); border-radius: 30px; font-size: 13px; font-weight: 700; color: var(--muted); background: var(--surface2); transition: all 0.2s; }
-        .parrow { font-size: 14px; color: var(--border); padding: 0 2px; transition: color 0.2s; }
-        .parrow.lit { color: var(--green); }
-        .pspinner { width: 11px; height: 11px; border: 2px solid rgba(0,0,0,0.15); border-top-color: currentColor; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+        /* Pipeline in sidebar */
+        .pipe-list { display: flex; flex-direction: column; gap: 0; }
+        .pipe-item { display: flex; align-items: flex-start; gap: 8px; padding: 4px 0; position: relative; }
+        .pipe-dot-wrap { display: flex; flex-direction: column; align-items: center; width: 12px; flex-shrink: 0; padding-top: 4px; }
+        .pipe-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border2); border: 2px solid var(--border); flex-shrink: 0; transition: all 0.2s; }
+        .pipe-dot-active { background: var(--blue); border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-bg); }
+        .pipe-dot-done   { background: var(--green); border-color: var(--green); }
+        .pipe-line { width: 2px; flex: 1; min-height: 16px; background: var(--border); margin-top: 2px; }
+        .pipe-info { display: flex; align-items: center; gap: 5px; flex: 1; min-width: 0; }
+        .pipe-name { font-size: 12px; font-weight: 500; color: var(--muted); }
+        .pipe-item.pipe-done .pipe-name  { color: var(--text); }
+        .pipe-item.pipe-active .pipe-name { color: var(--blue); font-weight: 600; }
+        .pipe-ai   { font-size: 9px; font-weight: 700; color: var(--purple); background: var(--purple-bg); border: 1px solid var(--purple-border); padding: 0 4px; border-radius: 3px; }
+        .pipe-check{ font-size: 11px; color: var(--green); font-weight: 700; }
+        .pipe-spin { width: 10px; height: 10px; border: 2px solid var(--blue-bg); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.7s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .status-msg { font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 8px; }
-        .error-box  { background: #fdeaea; border: 2px solid #fca5a5; border-radius: var(--rsm); padding: 14px 18px; font-size: 14px; font-weight: 600; color: #b91c1c; }
+        .pipe-status { font-size: 11px; color: var(--blue); margin-top: 8px; font-weight: 500; }
+
+        main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+        .error-bar { padding: 10px 14px; background: var(--red-bg); border: 1px solid var(--red-border); border-radius: var(--radius-sm); font-size: 13px; color: var(--red); font-weight: 500; }
 
         /* Tabs */
-        .tabs { display: flex; gap: 4px; background: white; border: 2px solid var(--border); border-radius: var(--radius); padding: 6px; }
-        .tab  { flex: 1; padding: 10px 6px; background: transparent; border: none; border-radius: var(--rsm); font-family: var(--sans); font-size: 12px; font-weight: 700; color: var(--muted); cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .tabs-wrap { display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px; box-shadow: var(--shadow-sm); }
+        .tab { flex: 1; padding: 7px 8px; background: transparent; border: none; border-radius: var(--radius-xs); font-family: var(--sans); font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer; transition: all 0.1s; display: flex; align-items: center; justify-content: center; gap: 5px; }
         .tab:hover { background: var(--surface2); color: var(--text); }
-        .tab-on { background: var(--text) !important; color: white !important; }
-        .tbadge { background: #e84c3d; color: white; font-size: 10px; font-weight: 800; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-        .tcontent { display: flex; flex-direction: column; gap: 16px; }
-        .fade-in  { animation: fadeUp 0.35s ease forwards; }
-        @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+        .tab-on { background: var(--surface2) !important; color: var(--text) !important; font-weight: 600; box-shadow: var(--shadow-sm); }
+        .tab-badge { background: var(--red); color: white; font-size: 10px; font-weight: 700; width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+
+        .tcontent { display: flex; flex-direction: column; gap: 12px; }
+        .fade-in { animation: fadeUp 0.25s ease forwards; }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
 
         /* KPI */
-        .kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
-        .kpi-card { background: white; border: 2px solid var(--border); border-top: 4px solid; border-radius: var(--radius); padding: 16px 18px; }
-        .kpi-dot  { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
-        .kpi-val  { font-size: 26px; font-weight: 800; color: var(--text); line-height: 1; }
-        .kpi-unit { font-size: 13px; font-weight: 600; color: var(--muted); }
-        .kpi-label{ font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 4px; }
-        .kpi-delta{ font-size: 11px; font-weight: 700; margin-top: 6px; }
+        .kpi-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+        .kpi-card { background: var(--surface); border: 1px solid var(--border); border-top: 3px solid; border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow-sm); }
+        .kpi-val  { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
+        .kpi-unit { font-size: 12px; font-weight: 500; color: var(--muted); }
+        .kpi-label{ font-size: 11px; color: var(--muted); font-weight: 500; margin-top: 3px; }
+        .kpi-delta{ font-size: 11px; font-weight: 600; margin-top: 5px; }
 
-        .cards-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
-        .placeholder { background: white; border: 2px dashed var(--border); border-radius: var(--radius); padding: 48px; display: flex; align-items: center; justify-content: center; text-align: center; flex-direction: column; }
-        .ph-title { font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 8px; }
-        .ph-sub   { font-size: 14px; color: var(--muted); font-weight: 600; max-width: 320px; }
+        .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
-        /* Shared section */
-        .sheader { display: flex; justify-content: space-between; align-items: flex-start; }
-        .stitle  { font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 2px; }
-        .ssub    { font-size: 13px; color: var(--muted); font-weight: 600; }
-        .sbadge  { padding: 5px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; }
-        .chip    { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
-        .mono    { font-size: 13px; font-weight: 700; color: var(--text); font-family: var(--mono); }
-        .sku     { font-family: var(--mono); font-size: 11px; font-weight: 500; background: var(--surface2); padding: 3px 7px; border-radius: 5px; color: var(--muted); }
+        /* Empty state */
+        .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); gap: 8px; box-shadow: var(--shadow-sm); }
+        .empty-icon  { font-size: 32px; opacity: 0.3; animation: rotate 10s linear infinite; }
+        @keyframes rotate { to { transform: rotate(360deg); } }
+        .empty-title { font-size: 16px; font-weight: 700; color: var(--text); }
+        .empty-sub   { font-size: 13px; color: var(--muted); text-align: center; max-width: 280px; }
 
-        /* Inventory table */
-        .inv-table { background: white; border: 2px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-        .inv-head  { display: grid; grid-template-columns: 100px 1fr 80px 120px 80px 70px 90px; padding: 12px 18px; background: var(--surface2); font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; gap: 12px; }
-        .inv-row   { display: grid; grid-template-columns: 100px 1fr 80px 120px 80px 70px 90px; padding: 14px 18px; border-top: 1px solid var(--border); align-items: center; gap: 12px; transition: background 0.15s; }
-        .inv-row:hover { background: var(--surface2); }
-        .inv-name  { font-size: 13px; font-weight: 700; color: var(--text); }
-        .bar-track { height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; margin-bottom: 3px; }
-        .bar-fill  { height: 100%; background: var(--teal); border-radius: 2px; }
+        /* Section header */
+        .section-header { display: flex; justify-content: space-between; align-items: flex-start; }
+        .section-title  { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+        .section-sub    { font-size: 12px; color: var(--muted); }
+        .section-badge  { padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid; }
+
+        /* Shared table */
+        .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); }
+        .table-head { display: grid; padding: 10px 16px; background: var(--surface2); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; gap: 12px; }
+        .table-row  { display: grid; padding: 12px 16px; border-top: 1px solid var(--border); align-items: center; gap: 12px; transition: background 0.1s; }
+        .table-row:hover { background: var(--surface2); }
+        .inv-cols { grid-template-columns: 90px 1fr 110px 80px 70px 80px; }
+        .mono-tag { font-family: var(--mono); font-size: 11px; background: var(--surface2); padding: 2px 7px; border-radius: 4px; color: var(--muted); border: 1px solid var(--border); white-space: nowrap; }
+        .mono-val { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--text); }
+        .row-name { font-size: 13px; font-weight: 500; color: var(--text); }
+        .mini-bar { height: 3px; background: var(--surface2); border-radius: 2px; overflow: hidden; margin-bottom: 3px; }
+        .mini-fill{ height: 100%; background: var(--green); border-radius: 2px; }
+        .badge    { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
 
         /* Planning */
-        .plan-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .plan-card   { background: white; border: 2px solid var(--border); border-left: 4px solid; border-radius: var(--radius); padding: 16px 18px; }
-        .plan-top    { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
-        .plan-id     { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--muted); display: block; }
-        .plan-sku    { font-size: 14px; font-weight: 800; color: var(--text); display: block; }
-        .plan-details{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .plan-detail { display: flex; flex-direction: column; gap: 1px; }
-        .dlabel { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
-        .dval   { font-size: 14px; font-weight: 800; color: var(--text); }
-        .sum-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; background: white; border: 2px solid var(--border); border-radius: var(--radius); padding: 20px; }
+        .plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .plan-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow-sm); }
+        .plan-top  { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+        .plan-id   { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+        .plan-method { font-size: 14px; font-weight: 700; color: var(--text); }
+        .plan-row  { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); padding: 4px 0; border-bottom: 1px solid var(--border); }
+        .plan-row:last-child { border: none; }
+        .plan-row strong { color: var(--text); font-weight: 600; }
+        .summary-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow-sm); }
         .sum-item { text-align: center; }
-        .sum-val  { font-size: 24px; font-weight: 800; color: var(--text); }
-        .sum-label{ font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 3px; }
+        .sum-val  { font-size: 20px; font-weight: 700; color: var(--text); }
+        .sum-label{ font-size: 11px; color: var(--muted); font-weight: 500; margin-top: 2px; }
 
-        /* Stock Policy */
-        .formula-box  { background: white; border: 2px solid var(--border); border-radius: var(--radius); padding: 20px; }
-        .formula-title{ font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 14px; }
-        .formula-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
-        .formula-item { border: 2px solid var(--border); border-top: 4px solid; border-radius: var(--rsm); padding: 14px; }
-        .formula-name { font-size: 14px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
-        .formula-eq   { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-bottom: 6px; background: var(--surface2); padding: 4px 8px; border-radius: 4px; }
-        .formula-desc { font-size: 12px; color: var(--muted); font-weight: 600; line-height: 1.4; }
-        .sp-head { display: grid; grid-template-columns: 160px repeat(7, 1fr); padding: 12px 18px; background: var(--surface2); font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; gap: 10px; }
-        .sp-row  { display: grid; grid-template-columns: 160px repeat(7, 1fr); padding: 14px 18px; border-top: 1px solid var(--border); align-items: center; gap: 10px; transition: background 0.15s; }
-        .sp-row:hover { background: var(--surface2); }
-        .sp-cell { display: flex; flex-direction: column; gap: 1px; }
-        .sp-val  { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--text); line-height: 1; }
-        .sp-unit { font-size: 10px; color: var(--muted); font-weight: 600; }
-        .sp-highlight { padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 800; text-align: center; }
-        .insight-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
-        .insight-card { background: white; border: 2px solid var(--border); border-left: 4px solid; border-radius: var(--radius); padding: 16px 18px; }
-        .insight-title{ font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-        .insight-val  { font-size: 22px; font-weight: 800; line-height: 1; margin-bottom: 6px; }
-        .insight-unit { font-size: 13px; font-weight: 600; color: var(--muted); }
-        .insight-desc { font-size: 12px; color: var(--muted); font-weight: 600; line-height: 1.4; }
+        /* Stock policy */
+        .formula-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+        .formula-card { background: var(--surface); border: 1px solid var(--border); border-top: 3px solid; border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--shadow-sm); }
+        .formula-name { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+        .formula-eq   { font-family: var(--mono); font-size: 11px; color: var(--muted); display: block; background: var(--surface2); padding: 3px 7px; border-radius: 4px; margin-bottom: 6px; }
+        .formula-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+        .sp-cols { grid-template-columns: 150px 60px 90px 90px 100px 90px 80px; }
+        .sp-highlight { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: var(--radius-xs); font-family: var(--mono); }
+        .insight-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+        .insight-card { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid; border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow-sm); }
+        .insight-label{ font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 5px; }
+        .insight-val  { font-size: 18px; font-weight: 700; line-height: 1.1; }
+        .insight-val span { font-size: 11px; font-weight: 500; color: var(--muted); }
 
         /* Risk */
-        .risk-list { display: flex; flex-direction: column; gap: 10px; }
-        .risk-item { background: white; border: 2px solid var(--border); border-left: 4px solid; border-radius: var(--radius); padding: 16px 18px; }
-        .risk-top  { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .risk-title{ font-size: 14px; font-weight: 800; color: var(--text); }
-        .risk-time { font-size: 12px; color: var(--muted); font-weight: 600; }
-        .risk-desc { font-size: 13px; color: var(--muted); font-weight: 600; line-height: 1.5; }
+        .risk-list { display: flex; flex-direction: column; gap: 8px; }
+        .risk-card { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid; border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow-sm); }
+        .risk-top  { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .risk-title{ font-size: 13px; font-weight: 700; color: var(--text); }
+        .risk-time { font-size: 11px; color: var(--muted); }
+        .risk-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
         .risk-sum-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
-        .risk-sum-item { border: 2px solid; border-radius: var(--rsm); padding: 14px; text-align: center; }
-        .risk-sum-count{ font-size: 28px; font-weight: 800; line-height: 1; }
-        .risk-sum-label{ font-size: 12px; font-weight: 700; margin-top: 4px; }
+        .risk-sum  { border: 1px solid; border-radius: var(--radius); padding: 14px; text-align: center; box-shadow: var(--shadow-sm); }
+        .risk-sum-n{ font-size: 26px; font-weight: 800; line-height: 1; }
+        .risk-sum-l{ font-size: 12px; font-weight: 600; margin-top: 3px; }
 
         @media (max-width: 1100px) {
-          .kpi-grid { grid-template-columns: repeat(2,1fr); }
-          .formula-grid { grid-template-columns: repeat(2,1fr); }
-          .insight-grid { grid-template-columns: repeat(2,1fr); }
+          .kpi-row { grid-template-columns: repeat(2,1fr); }
+          .formula-row { grid-template-columns: repeat(2,1fr); }
+          .insight-row { grid-template-columns: repeat(2,1fr); }
         }
         @media (max-width: 900px) {
-          .body { grid-template-columns: 1fr; padding: 16px; }
+          .layout { grid-template-columns: 1fr; padding: 12px; }
           aside { position: static; }
-          .cards-grid { grid-template-columns: 1fr; }
-          .plan-grid  { grid-template-columns: 1fr; }
-          .sum-grid   { grid-template-columns: repeat(2,1fr); }
-          .tabs .tab  { font-size: 11px; padding: 8px 4px; }
-          .hright .stat-pill { display: none; }
-          .sp-head, .sp-row { grid-template-columns: 140px repeat(4,1fr); }
-          .sp-head span:nth-child(n+6), .sp-row > *:nth-child(n+6) { display: none; }
+          .results-grid { grid-template-columns: 1fr; }
+          .plan-grid { grid-template-columns: 1fr; }
+          .summary-row { grid-template-columns: repeat(2,1fr); }
+          .tabs-wrap .tab { font-size: 11px; }
+          .hright .header-btn { display: none; }
         }
       `}</style>
     </div>
   );
 }
 
-function delay(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
+function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
