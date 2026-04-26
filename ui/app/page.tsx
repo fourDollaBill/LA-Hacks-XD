@@ -7,7 +7,6 @@ import ForecastCard    from "@/components/forecast-card";
 import InventoryCard   from "@/components/inventory-card";
 import DecisionCard    from "@/components/decision-card";
 import WhatIfSliders, { WhatIfValues } from "@/components/what-if-sliders";
-import PredictionGraph from "@/components/prediction-graph";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -63,7 +62,7 @@ const PIPELINE = [
 ];
 
 type PStep = "idle" | "active" | "done";
-type Tab   = "overview" | "whatif" | "inventory" | "planning" | "prediction" | "risk";
+type Tab   = "overview" | "whatif" | "inventory" | "planning" | "risk";
 
 let _orderId = 1000;
 
@@ -195,7 +194,7 @@ export default function Home() {
     { id: "whatif",      label: "What-if"        },
     { id: "inventory",   label: "Inventory"      },
     { id: "planning",    label: "Planning", badge: orders.length > 0 ? String(orders.length) : undefined },
-    { id: "prediction",  label: "30-Day Forecast" },
+
     { id: "risk",        label: "Risk Monitor", badge: "1" },
   ];
 
@@ -483,36 +482,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* ── 30-DAY PREDICTION ── */}
-          {tab === "prediction" && (
-            <div className="tcontent fade-in">
-              <div className="section-header" style={{ marginBottom: 12 }}>
-                <div>
-                  <div className="section-title">30-Day Forecast</div>
-                  <div className="section-sub">
-                    {result
-                      ? `Projected inventory and demand for the ${result.scenario} scenario`
-                      : "Run a scenario first to see the 30-day projection"}
-                  </div>
-                </div>
-                {result && (
-                  <span className="sec-badge" style={{ background: "var(--blue-bg)", color: "var(--blue)", borderColor: "var(--blue-border)" }}>
-                    {result.forecast.trend} trend
-                  </span>
-                )}
-              </div>
-
-              {result ? (
-                <PredictionGraph result={result} />
-              ) : (
-                <div className="empty-state">
-                  <div className="empty-icon">📈</div>
-                  <div className="empty-title">No scenario selected</div>
-                  <div className="empty-sub">Run any scenario from the sidebar to see the 30-day inventory and demand projection.</div>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* ── RISK MONITOR ── */}
           {tab === "risk" && (
