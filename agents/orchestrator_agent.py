@@ -1,7 +1,6 @@
 """
 agents/orchestrator_agent.py
-Upgraded async orchestrator — coordinates all agents including
-LLM-powered ForecastAgent and DecisionAgent.
+Full async orchestrator — all 3 LLM agents (Forecast, Transport, Decision).
 """
 import csv
 from pathlib import Path
@@ -54,22 +53,24 @@ def get_scenario_data(scenario_name: str) -> dict:
 
 def list_scenarios() -> list[dict]:
     return [
-        {"name": r["scenario_name"], "label": r["label"],
-         "color": r["color"], "description": r["description"]}
+        {
+            "name":        r["scenario_name"],
+            "label":       r["label"],
+            "color":       r["color"],
+            "description": r["description"],
+        }
         for r in load_csv("scenarios.csv")
     ]
 
 
 class OrchestratorAgent:
     """
-    Coordinates all agents in sequence:
+    Chains all agents — 3 now use LLM reasoning:
       1. ForecastAgent   — LLM reasons about demand trend
-      2. InventoryAgent  — deterministic stock evaluation
-      3. TransportAgent  — deterministic cost comparison
-      4. DecisionAgent   — LLM weighs everything and decides
-      5. LLM Explainer   — final human-readable summary
-
-    Each agent's output is passed as context to the next.
+      2. InventoryAgent  — deterministic
+      3. TransportAgent  — LLM validates transport choice, handles port delays
+      4. DecisionAgent   — LLM makes final call with confidence score
+      5. LLM Explainer   — human-readable summary
     """
 
     def __init__(self):
@@ -81,12 +82,18 @@ class OrchestratorAgent:
     async def run(self, scenario_name: str, overrides: dict | None = None) -> tuple[RunResult, dict]:
         data = get_scenario_data(scenario_name)
         if overrides:
+            # Handle demand multiplier specially
+            multiplier = overrides.pop("demand_multiplier", None)
+            if multiplier and multiplier != 1.0:
+                data["demand_history"] = [
+                    round(d * multiplier) for d in data["demand_history"]
+                ]
             data.update(overrides)
 
-        # Step 1: ForecastAgent — LLM reasons about demand
+        # 1. Forecast
         forecast = await self.forecast_agent.run(data["demand_history"])
 
-        # Step 2: InventoryAgent — deterministic, uses forecast as input
+        # 2. Inventory (deterministic — receives forecast context)
         inventory = self.inventory_agent.run(
             total_units=data["total_units"],
             expiring_soon=data["expiring_soon"],
@@ -95,16 +102,18 @@ class OrchestratorAgent:
             forecast=forecast,
         )
 
-        # Step 3: TransportAgent — deterministic, uses inventory + forecast
-        transport = self.transport_agent.run(
+        # 3. Transport (LLM validates — receives inventory + forecast)
+        transport = await self.transport_agent.run(
             truck_cost_per_unit=data["truck_cost_per_unit"],
             intermodal_cost_per_unit=data["intermodal_cost_per_unit"],
             fuel_cost_index=data["fuel_cost_index"],
             inventory=inventory,
             forecast=forecast,
+            lead_time_truck=data["lead_time_truck"],
+            lead_time_intermodal=data["lead_time_intermodal"],
         )
 
-        # Step 4: DecisionAgent — LLM weighs forecast + inventory + transport
+        # 4. Decision (LLM reasons — receives everything)
         decision = await self.decision_agent.run(
             reorder_threshold=data["reorder_threshold"],
             order_max=data["order_max"],
@@ -121,7 +130,7 @@ class OrchestratorAgent:
             decision=decision,
         )
 
-        # Step 5: Final LLM explanation
+        # 5. Final explanation
         result.llm_explanation = await get_explanation(result)
 
         return result, data
