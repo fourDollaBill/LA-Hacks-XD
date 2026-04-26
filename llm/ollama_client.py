@@ -95,20 +95,31 @@ async def reason(prompt: str, expect_json: bool = False, retries: int = 2) -> st
 
 
 async def get_explanation(result: RunResult) -> str:
-    """Final human-readable explanation of a RunResult."""
-    prompt = f"""You are a supply chain advisor. A manager needs a clear 2-3 sentence explanation of this decision.
+    """Final human-readable explanation — includes savings and USE THIS label."""
+    truck_score = result.transport.truck.total_score
+    inter_score = result.transport.intermodal.total_score
+    savings     = round(abs(truck_score - inter_score), 2)
+    cheaper     = "truck" if truck_score <= inter_score else "intermodal"
+    recommended = result.decision.transport_method
 
-Scenario: {result.scenario}
-Decision: {result.decision.action}
-Order quantity: {result.decision.order_quantity} units
-Transport: {result.decision.transport_method}
-Forecast: {result.forecast.predicted_demand} units/day, trend is {result.forecast.trend}
-Inventory: {result.inventory.usable_inventory} usable units, {result.inventory.days_until_stockout} days until stockout
-Spoilage risk: {result.inventory.spoilage_risk}, Stockout risk: {result.inventory.stockout_risk}
-Truck cost: ${result.transport.truck.total_score}/unit vs Intermodal: ${result.transport.intermodal.total_score}/unit (incl. spoilage penalty)
-Fuel index: ×{result.transport.fuel_index}
-Reasoning: transport cost ${result.decision.reasoning.transport_cost}, stockout penalty ${result.decision.reasoning.stockout_risk_cost}, spoilage penalty ${result.decision.reasoning.spoilage_risk_cost}
-
-Write 2-3 confident, jargon-free sentences explaining WHY this decision was made. No bullet points."""
+    prompt = (
+        "You are a supply chain advisor giving a final recommendation to a manager.\n\n"
+        f"Scenario: {result.scenario}\n"
+        f"Decision: {result.decision.action}\n"
+        f"Order quantity: {result.decision.order_quantity} units\n"
+        f"USE THIS transport: {recommended}\n"
+        f"Savings: ${savings}/unit by choosing {cheaper} over the alternative\n"
+        f"Forecast: {result.forecast.predicted_demand} units/day, trend={result.forecast.trend}\n"
+        f"Inventory: {result.inventory.usable_inventory} usable units, {result.inventory.days_until_stockout} days to stockout\n"
+        f"Spoilage risk: {result.inventory.spoilage_risk}, Stockout risk: {result.inventory.stockout_risk}\n"
+        f"Truck: ${truck_score}/unit (2-day) vs Intermodal: ${inter_score}/unit (5-day incl. spoilage penalty)\n"
+        f"Fuel index: {result.transport.fuel_index}\n"
+        f"Total cost score: ${result.decision.total_cost_score}\n\n"
+        "Write exactly 3 sentences:\n"
+        "1. What the decision is and which transport to USE (say 'Use [method]' explicitly)\n"
+        "2. Why this transport saves money or reduces risk vs the alternative (include the savings figure)\n"
+        "3. The key risk factor that drove this decision\n\n"
+        "Be confident and specific. No bullet points."
+    )
 
     return await reason(prompt, expect_json=False)
