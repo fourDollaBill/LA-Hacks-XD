@@ -1,0 +1,3 @@
+mode,cost_per_unit,lead_time_days,description
+truck,4.50,2,Fast but expensive. Best for urgent or high-spoilage-risk shipments.
+intermodal,2.80,5,Cheaper but slower. Risk of increased spoilage on perishable goods.
