@@ -1,3 +1,4 @@
+
 "use client";
 import { DecisionResult, TransportResult, InventoryResult, ForecastResult } from "@/lib/api";
 
@@ -82,14 +83,26 @@ export default function DecisionCard({ decision, transport, inventory, forecast,
   const interMissed  = interOrderDays <= 0 || !transport.intermodal.available;
   const interUrgent  = !interMissed && interOrderDays <= 2;
 
-  // Money saved calculation
-  const truckTotal    = transport.truck.total_score;
-  const interTotal    = transport.intermodal.total_score;
-  const cheaperMethod = truckTotal <= interTotal ? "truck" : "intermodal";
-  const savingsPerUnit= Math.abs(truckTotal - interTotal).toFixed(2);
-  const totalSavings  = decision.order_quantity > 0
-    ? (Math.abs(truckTotal - interTotal) * decision.order_quantity).toFixed(2)
+  // Best transport = the one the AI decided on (accounts for spoilage, stockout, fuel — not just raw cost)
+  const truckTotal      = transport.truck.total_score;
+  const interTotal      = transport.intermodal.total_score;
+  const recMethod       = decision.transport_method; // the AI's actual recommendation
+  const recIsIntermodal = recMethod.includes("intermodal");
+  const recScore        = recIsIntermodal ? interTotal : truckTotal;
+  const altScore        = recIsIntermodal ? truckTotal : interTotal;
+  const altName         = recIsIntermodal ? "truck" : "intermodal";
+  // Savings = how much better the recommended method is vs the alternative per unit
+  const savingsPerUnit  = Math.max(0, altScore - recScore).toFixed(2);
+  const totalSavings    = decision.order_quantity > 0
+    ? (Math.max(0, altScore - recScore) * decision.order_quantity).toFixed(2)
     : null;
+  // Why it's better — not always cheapest, sometimes faster/safer
+  const savingsReason   = recIsIntermodal
+    ? (parseFloat(savingsPerUnit) > 0 ? "lower total cost incl. spoilage" : "lower base cost despite spoilage penalty")
+    : (transport.intermodal.available === false ? "intermodal unavailable (arrives after stockout)"
+      : inventory.spoilage_risk === "critical" || inventory.spoilage_risk === "high"
+        ? "faster delivery prevents spoilage losses"
+        : parseFloat(savingsPerUnit) > 0 ? "lower total cost score" : "safer given current risk levels");
 
   const costBars = [
     { label: "Transport",     val: decision.reasoning.transport_cost,    color: "#2563eb" },
@@ -187,16 +200,23 @@ export default function DecisionCard({ decision, transport, inventory, forecast,
       )}
 
       {/* ── Savings banner ── */}
-      {isReorder && totalSavings && parseFloat(totalSavings) > 0 && (
+      {isReorder && (
         <div className="savings-banner">
           <div className="savings-left">
-            <span className="savings-icon">💰</span>
+            <span className="savings-icon">{parseFloat(savingsPerUnit) > 0 ? "💰" : "✅"}</span>
             <div>
               <div className="savings-title">
-                Using <strong>{cheaperMethod === "truck" ? "🚛 Truck" : "🚂 Intermodal"}</strong> saves{" "}
-                <strong style={{ fontSize: 16, color: "#16a34a" }}>${totalSavings}</strong> on this order
+                <strong>{recIsIntermodal ? "🚂 Intermodal" : "🚛 Truck"}</strong> is the best option —{" "}
+                {savingsReason}
+                {parseFloat(totalSavings ?? "0") > 0 && (
+                  <> · saves <strong style={{ fontSize: 15, color: "#16a34a" }}>${totalSavings}</strong> on this order</>
+                )}
               </div>
-              <div className="savings-sub">${savingsPerUnit}/unit × {decision.order_quantity} units vs alternative method</div>
+              <div className="savings-sub">
+                {parseFloat(savingsPerUnit) > 0
+                  ? `$${savingsPerUnit}/unit × ${decision.order_quantity} units vs ${altName}`
+                  : `Chosen for safety and reliability over ${altName}`}
+              </div>
             </div>
           </div>
           {isReorder && (
