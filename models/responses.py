@@ -8,17 +8,17 @@ class ForecastResult(BaseModel):
     trend:            str
     confidence:       str
     history:          list[int]
-    reasoning:        Optional[str] = None   # LLM's explanation of the forecast
+    reasoning:        Optional[str] = None
 
 
 class InventoryResult(BaseModel):
-    total_inventory:    int
-    expiring_units:     int
-    usable_inventory:   int
-    spoilage_percent:   float
+    total_inventory:     int
+    expiring_units:      int
+    usable_inventory:    int
+    spoilage_percent:    float
     days_until_stockout: float
-    spoilage_risk:      str
-    stockout_risk:      str
+    spoilage_risk:       str
+    stockout_risk:       str
 
 
 class TransportOption(BaseModel):
@@ -26,6 +26,8 @@ class TransportOption(BaseModel):
     lead_time_days:   int
     spoilage_penalty: float
     total_score:      float
+    available:        bool    = True   # False = e.g. port closed
+    notes:            Optional[str] = None  # e.g. "Port delay: 12-day lead time"
 
 
 class TransportResult(BaseModel):
@@ -33,6 +35,8 @@ class TransportResult(BaseModel):
     intermodal:  TransportOption
     recommended: str
     fuel_index:  float
+    reasoning:   Optional[str] = None  # LLM transport reasoning
+    risk_flags:  list[str]    = []     # e.g. ["Port delay", "Fuel elevated"]
 
 
 class CostBreakdown(BaseModel):
@@ -42,13 +46,14 @@ class CostBreakdown(BaseModel):
 
 
 class DecisionResult(BaseModel):
-    action:            str
-    should_reorder:    bool
-    order_quantity:    int
-    transport_method:  str
-    total_cost_score:  float
-    reasoning:         CostBreakdown
-    decision_reasoning: Optional[str] = None  # LLM's reasoning for the decision
+    action:             str
+    should_reorder:     bool
+    order_quantity:     int
+    transport_method:   str
+    total_cost_score:   float
+    confidence_score:   int            # 0-100 — how confident the AI is
+    reasoning:          CostBreakdown
+    decision_reasoning: Optional[str] = None
 
 
 class RunResult(BaseModel):
