@@ -3,23 +3,19 @@ import { InventoryResult } from "@/lib/api";
 
 type Risk = "low" | "moderate" | "high" | "critical";
 
-const RISK = {
-  low:      { bg: "#e6f9ee", color: "#1a7a3c", label: "Low" },
-  moderate: { bg: "#fff4e0", color: "#c47a00", label: "Moderate" },
-  high:     { bg: "#fff0e8", color: "#c24a10", label: "High" },
-  critical: { bg: "#fdeaea", color: "#b91c1c", label: "Critical" },
+const RISK: Record<Risk, { bg: string; color: string; border: string; label: string }> = {
+  low:      { bg: "var(--green-bg)",  color: "var(--green)",  border: "var(--green-border)",  label: "Low"      },
+  moderate: { bg: "var(--amber-bg)",  color: "var(--amber)",  border: "var(--amber-border)",  label: "Moderate" },
+  high:     { bg: "#fff7ed",          color: "#c2410c",        border: "#fed7aa",               label: "High"     },
+  critical: { bg: "var(--red-bg)",    color: "var(--red)",    border: "var(--red-border)",    label: "Critical" },
 };
 
-function RiskChip({ level }: { level: Risk }) {
+function RiskBadge({ level }: { level: Risk }) {
   const r = RISK[level];
   return (
     <span style={{
-      background: r.bg,
-      color: r.color,
-      padding: "3px 10px",
-      borderRadius: 20,
-      fontSize: 12,
-      fontWeight: 700,
+      background: r.bg, color: r.color, border: `1px solid ${r.border}`,
+      padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 600,
     }}>
       {r.label}
     </span>
@@ -27,38 +23,40 @@ function RiskChip({ level }: { level: Risk }) {
 }
 
 export default function InventoryCard({ data }: { data: InventoryResult }) {
-  const usablePct = Math.round((data.usable_inventory / data.total_inventory) * 100);
+  const usablePct   = Math.round((data.usable_inventory / data.total_inventory) * 100);
   const expiringPct = Math.round((data.expiring_units / data.total_inventory) * 100);
-  const r = RISK[data.spoilage_risk];
+  const r = RISK[data.spoilage_risk as Risk];
 
   return (
     <div className="card">
-      <div className="card-top">
-        <div className="icon-wrap" style={{ background: "#e6f9ee" }}>📦</div>
-        <div>
-          <div className="card-title">Inventory</div>
-          <RiskChip level={data.spoilage_risk} />
+      <div className="card-head">
+        <div className="card-title">
+          <span className="icon">📦</span>
+          Inventory Status
         </div>
+        <RiskBadge level={data.spoilage_risk as Risk} />
       </div>
 
       <div className="metrics">
         <div className="metric">
-          <div className="big-num">{data.usable_inventory.toLocaleString()}</div>
+          <div className="metric-val">{data.usable_inventory.toLocaleString()}</div>
           <div className="metric-label">usable units</div>
         </div>
         <div className="divider" />
         <div className="metric">
-          <div className="big-num">{data.days_until_stockout}d</div>
+          <div className="metric-val" style={{ color: data.days_until_stockout <= 5 ? "var(--red)" : "var(--text)" }}>
+            {data.days_until_stockout}d
+          </div>
           <div className="metric-label">to stockout</div>
         </div>
         <div className="divider" />
         <div className="metric">
-          <div className="big-num" style={{ color: r.color }}>{data.expiring_units}</div>
+          <div className="metric-val" style={{ color: r.color }}>{data.expiring_units}</div>
           <div className="metric-label">expiring</div>
         </div>
       </div>
 
-      <div className="bar-wrap">
+      <div className="bar-section">
         <div className="bar-labels">
           <span>Usable <strong>{usablePct}%</strong></span>
           <span style={{ color: r.color }}>Expiring <strong>{expiringPct}%</strong></span>
@@ -69,113 +67,45 @@ export default function InventoryCard({ data }: { data: InventoryResult }) {
         </div>
       </div>
 
-      <div className="risks">
-        <div className="risk-row">
+      <div className="risk-row">
+        <div className="risk-item">
           <span className="risk-label">Spoilage</span>
-          <RiskChip level={data.spoilage_risk} />
+          <RiskBadge level={data.spoilage_risk as Risk} />
         </div>
-        <div className="risk-row">
+        <div className="risk-item">
           <span className="risk-label">Stockout</span>
-          <RiskChip level={data.stockout_risk} />
+          <RiskBadge level={data.stockout_risk as Risk} />
         </div>
       </div>
 
       <style jsx>{`
         .card {
           background: var(--surface);
-          border: 2px solid var(--border);
+          border: 1px solid var(--border);
           border-radius: var(--radius);
-          padding: 20px;
+          padding: 18px;
+          box-shadow: var(--shadow-sm);
         }
 
-        .card-top {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin-bottom: 18px;
-        }
+        .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .card-title { font-size: 13px; font-weight: 600; color: var(--text2); display: flex; align-items: center; gap: 6px; }
+        .icon { font-size: 15px; }
 
-        .icon-wrap {
-          width: 40px; height: 40px;
-          border-radius: 10px;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 18px;
-          flex-shrink: 0;
-        }
+        .metrics { display: flex; align-items: center; background: var(--surface2); border-radius: var(--radius-xs); padding: 12px 0; margin-bottom: 14px; }
+        .metric  { flex: 1; text-align: center; }
+        .divider { width: 1px; height: 28px; background: var(--border); flex-shrink: 0; }
+        .metric-val   { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
+        .metric-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
-        .card-title {
-          font-weight: 800;
-          font-size: 15px;
-          color: var(--text);
-          margin-bottom: 4px;
-        }
+        .bar-section { margin-bottom: 14px; }
+        .bar-labels  { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+        .bar-track   { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; display: flex; position: relative; }
+        .bar-usable  { height: 100%; background: var(--green); border-radius: 3px 0 0 3px; transition: width 0.5s; }
+        .bar-expiring{ position: absolute; right: 0; height: 100%; border-radius: 0 3px 3px 0; transition: width 0.5s; }
 
-        .metrics {
-          display: flex;
-          align-items: center;
-          background: var(--surface2);
-          border-radius: var(--rsm);
-          padding: 12px 0;
-          margin-bottom: 16px;
-        }
-
-        .metric { flex: 1; text-align: center; }
-
-        .divider { width: 1px; height: 32px; background: var(--border); flex-shrink: 0; }
-
-        .big-num {
-          font-weight: 800;
-          font-size: 24px;
-          color: var(--text);
-          line-height: 1;
-        }
-
-        .metric-label { font-size: 11px; color: var(--muted); margin-top: 3px; font-weight: 600; }
-
-        .bar-wrap { margin-bottom: 16px; }
-
-        .bar-labels {
-          display: flex;
-          justify-content: space-between;
-          font-size: 12px;
-          color: var(--muted);
-          font-weight: 600;
-          margin-bottom: 6px;
-        }
-
-        .bar-track {
-          height: 8px;
-          background: var(--surface2);
-          border-radius: 4px;
-          overflow: hidden;
-          display: flex;
-          position: relative;
-        }
-
-        .bar-usable {
-          height: 100%;
-          background: var(--teal);
-          border-radius: 4px 0 0 4px;
-          transition: width 0.7s cubic-bezier(.4,0,.2,1);
-        }
-
-        .bar-expiring {
-          position: absolute;
-          right: 0;
-          height: 100%;
-          border-radius: 0 4px 4px 0;
-          transition: width 0.7s;
-        }
-
-        .risks { display: flex; gap: 12px; }
-
-        .risk-row {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .risk-label { font-size: 12px; color: var(--muted); font-weight: 700; }
+        .risk-row  { display: flex; gap: 16px; }
+        .risk-item { display: flex; align-items: center; gap: 8px; }
+        .risk-label{ font-size: 11px; color: var(--muted); font-weight: 500; }
       `}</style>
     </div>
   );
