@@ -1,0 +1,6 @@
+scenario_name,day_1,day_2,day_3,day_4,day_5,day_6,day_7
+normal,80,85,78,90,88,82,86
+high_demand,80,95,130,160,175,180,190
+high_fuel,80,82,79,84,83,81,85
+expiry_risk,80,82,79,84,83,81,85
+low_stock,80,88,95,102,108,115,120
