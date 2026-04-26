@@ -57,11 +57,14 @@ _session_history: dict[str, list[dict]] = {}
 # ── Intent parsing ────────────────────────────────────────────────────────────
 
 SCENARIO_KEYWORDS = {
-    "normal":       ["normal", "baseline", "standard", "regular", "default"],
-    "high_demand":  ["high demand", "demand spike", "surge", "spike", "demand increase", "busy"],
-    "high_fuel":    ["fuel", "gas price", "fuel cost", "expensive fuel", "fuel surge"],
-    "expiry_risk":  ["expir", "spoil", "perishable", "waste", "expiry", "going bad"],
-    "low_stock":    ["low stock", "critical stock", "stockout", "out of stock", "running low", "critical"],
+    "normal":          ["normal", "baseline", "standard", "regular", "default"],
+    "high_demand":     ["high demand", "demand spike", "surge", "spike", "demand increase", "busy"],
+    "high_fuel":       ["fuel", "gas price", "fuel cost", "expensive fuel", "fuel surge"],
+    "expiry_risk":     ["expir", "spoil", "perishable", "waste", "expiry", "going bad"],
+    "low_stock":       ["low stock", "critical stock", "stockout", "out of stock", "running low", "critical"],
+    "port_delay":      ["port", "port delay", "congestion", "intermodal delay", "shipping delay"],
+    "heatwave":        ["heat", "heatwave", "hot weather", "temperature", "shelf life drop"],
+    "competitor_out":  ["competitor", "competitor out", "competitor stockout", "demand tripled", "3x demand"],
 }
 
 def parse_intent(text: str):
