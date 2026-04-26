@@ -6,7 +6,7 @@ import httpx
 from models.responses import RunResult
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "llama3"
+OLLAMA_MODEL = "deepseek-r1:70b"
 
 
 def build_prompt(result: RunResult) -> str:
